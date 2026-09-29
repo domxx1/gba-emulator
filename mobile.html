@@ -81,7 +81,7 @@ async function loadProject(id){
   st.textContent="Lade Artefakt "+run.head_sha.slice(0,7)+"…";
   const aj=await (await gh("https://api.github.com/repos/"+p.repo+"/actions/runs/"+run.id+"/artifacts")).json();
   const a=(aj.artifacts||[]).find(x=>x.name===p.artifact&&!x.expired);if(!a)throw Error("Passendes Build-Artefakt fehlt oder ist abgelaufen.");
-  const zr=await gh(a.archive_download_url,{headers:{Accept:"application/octet-stream"}});const zip=await JSZip.loadAsync(await zr.arrayBuffer());
+  const zr=await gh(a.archive_download_url);const zip=await JSZip.loadAsync(await zr.arrayBuffer());
   const names=Object.keys(zip.files).filter(n=>/\.gba$/i.test(n)&&!zip.files[n].dir);if(!names.length)throw Error("Im Artefakt wurde keine .gba gefunden.");
   const blob=new Blob([await zip.files[names[0]].async("arraybuffer")],{type:"application/octet-stream"}),hash=await sha256(blob);
   const entry={id:p.key,saveKey:p.key,name:p.title+".gba",blob,source:"github",repo:p.repo,branch:p.branch,sha:run.head_sha,buildTime:run.created_at,contentHash:hash,lastPlayed:Date.now()};
