@@ -40,7 +40,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.18 · Turbo-Performance</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.19 · Emulator-Cleanup</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -366,8 +366,37 @@ async function loadStateNow(slot){
 async function updateSaveUI(){return}
 
 
-function cleanup(){try{setTurboPerformance(false)}catch(e){}clearInterval(speedMeterTimer);speedMeterTimer=null;if(romUrl)URL.revokeObjectURL(romUrl);romUrl=null;game.innerHTML="";document.getElementById("ejs-loader")?.remove()}
-async function startGame(id){const r=await one(ROMS,id);if(!r)return;cleanup();currentGame=r;r.lastPlayed=Date.now();await put(ROMS,r);if(token())try{await syncFromCloud(false)}catch(e){console.warn(e)}
+async function cleanup(waitForAbort=false){
+ const old=window.EJS_emulator;
+ try{setTurboPerformance(false)}catch(e){}
+ clearInterval(speedMeterTimer);speedMeterTimer=null;
+ clearTimeout(cloudTimer);cloudTimer=null;
+
+ if(old){
+  try{
+   // Stop EmulatorJS' periodic save timer first.
+   if(typeof old.startSaveInterval==="function")old.startSaveInterval(0);
+   else if(old.saveSaveInterval){clearInterval(old.saveSaveInterval);old.saveSaveInterval=null;}
+  }catch(e){console.warn("Save interval cleanup",e)}
+  try{
+   // This is the same exit event used by EmulatorJS itself. Its GameManager
+   // stops the main loop, flushes saves, unmounts IDBFS and aborts the old WASM module.
+   old.callEvent("exit");
+  }catch(e){
+   console.warn("Emulator exit cleanup",e);
+   try{old.gameManager?.toggleMainLoop?.(0)}catch(_){}
+   try{old.gameManager?.functions?.toggleMainLoop?.(0)}catch(_){}
+  }
+  if(window.EJS_emulator===old)window.EJS_emulator=null;
+  if(waitForAbort)await new Promise(r=>setTimeout(r,1100));
+ }
+
+ if(romUrl)URL.revokeObjectURL(romUrl);
+ romUrl=null;
+ game.innerHTML="";
+ document.getElementById("ejs-loader")?.remove();
+}
+async function startGame(id){const r=await one(ROMS,id);if(!r)return;await cleanup(true);currentGame=r;r.lastPlayed=Date.now();await put(ROMS,r);if(token())try{await syncFromCloud(false)}catch(e){console.warn(e)}
  romUrl=URL.createObjectURL(r.blob);gameTitle.textContent=r.name.replace(/\.gba$/i,"");libraryPanel.classList.add("hidden");playerPanel.classList.remove("hidden");await updateSaveUI();await updateStateUI();
  window.EJS_player="#game";window.EJS_core="gba";window.EJS_gameName=r.saveKey;window.EJS_gameID=parseInt((r.contentHash||r.id).slice(0,8),16)||12345;window.EJS_gameUrl=romUrl;window.EJS_pathtodata="https://cdn.emulatorjs.org/4.2.3/data/";window.EJS_startOnLoaded=true;window.EJS_language="de-DE";window.EJS_fixedSaveInterval=10000;
  window.EJS_onGameStart=()=>setTimeout(()=>{speedIndex=2;applyEmulatorSpeed();startSpeedMeter();injectLocalSave();game.focus({preventScroll:true})},900);
@@ -377,7 +406,7 @@ document.querySelectorAll(".stateSaveSlot").forEach(b=>b.onclick=async()=>{try{a
 document.querySelectorAll(".stateLoadSlot").forEach(b=>b.onclick=async()=>{try{await loadStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
 $("quickLoadBtn").onclick=async()=>{try{await loadStateNow(1)}catch(e){alert(e.message)}};
 $("quickSaveBtn").onclick=async()=>{try{await saveStateNow(1,false)}catch(e){alert(e.message)}};
-$("backBtn").onclick=async()=>{cleanup();currentGame=null;playerPanel.classList.add("hidden");libraryPanel.classList.remove("hidden");render()};
+$("backBtn").onclick=async()=>{await cleanup(true);currentGame=null;playerPanel.classList.add("hidden");libraryPanel.classList.remove("hidden");render()};
 
 const SPEED_STEPS=[0.5,0.67,1,1.5,2,3,4,5,6,8,10,"max"];
 let speedIndex=2;
@@ -537,5 +566,14 @@ window.addEventListener("keydown",e=>{
  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","Spacebar"].includes(e.key))e.preventDefault();
 },{capture:true,passive:false});
 game.addEventListener("pointerdown",()=>game.focus({preventScroll:true}));
+window.addEventListener("pagehide",()=>{
+ try{
+  const old=window.EJS_emulator;
+  if(old){
+   if(typeof old.startSaveInterval==="function")old.startSaveInterval(0);
+   old.callEvent("exit");
+  }
+ }catch(e){}
+});
 render();if(token()){$("connect").click()}
 </script></body></html>
