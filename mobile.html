@@ -19,7 +19,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.5 · EJS 4.2.3</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.6 · Cloud States</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -44,8 +44,8 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 <div class="player-head"><div><div class="muted">AKTIVES SPIEL</div><strong id="gameTitle">Game Boy Advance</strong></div><button id="backBtn">← Bibliothek</button></div>
 <div class="savebar" style="margin-top:0;margin-bottom:10px">
 <div id="stateStatus" class="save-status"><span class="dot"></span>Noch kein Save State</div>
-<button id="stateSaveBtn" class="primary">Save State</button>
-<button id="stateLoadBtn" disabled>State laden</button>
+<button id="stateSaveBtn" class="primary">Save State + Cloud</button>
+<button id="stateLoadBtn" disabled>State laden (neuester)</button>
 </div>
 <div id="game"></div>
 <div class="savebar">
@@ -56,14 +56,14 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </div>
 </section>
 
-<section class="panel"><h2>Speicherstände</h2><div class="note"><b>Save States sind die primäre Speicherart.</b> Sie speichern den kompletten Emulatorzustand und werden pro ROM-Build gekennzeichnet. Normale Pokémon-Ingame-Saves bleiben zusätzlich als Backup erhalten. Save States können zwischen unterschiedlichen ROM-Builds inkompatibel sein.</div></section>
+<section class="panel"><h2>Speicherstände</h2><div class="note"><b>Save States sind die primäre Speicherart.</b> Bei GitHub-Verbindung werden sie lokal und zusätzlich im privaten <code>cloud-saves</code>-Branch des jeweiligen Spiele-Repositories gespeichert. Auf einem zweiten Gerät lädt „State laden (neuester)“ automatisch den aktuellsten lokalen oder Cloud-State. Normale Pokémon-Ingame-Saves bleiben zusätzlich als Backup erhalten. Save States können zwischen unterschiedlichen ROM-Builds inkompatibel sein.</div></section>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
-const DB="gba-cloud-v04", ROMS="roms", SAVES="saves", STATES="states", SAVE_REPO="domxx1/gba-emulator";
+const DB="gba-cloud-v04", ROMS="roms", SAVES="saves", STATES="states";
 const PROJECTS={
- smaragd:{key:"smaragd-plus",title:"Pokémon Smaragd Plus",repo:"domxx1/pokemon-smaragd-plus",branch:"feature/overworld-encounters",workflow:"Smaragd Plus Build",artifact:"smaragd-plus-test-build"},
- retronium:{key:"retronium",title:"Pokémon Retronium",repo:"domxx1/pokemon-retronium",branch:"feature/retro-platinum-restart",workflow:"Retronium Retro Platinum Base",artifact:"Pokemon-Retronium-Retro-Platinum-Basis"}
+ smaragd:{key:"smaragd-plus",title:"Pokémon Smaragd Plus",repo:"domxx1/pokemon-smaragd-plus",branch:"feature/overworld-encounters",saveBranch:"cloud-saves",workflow:"Smaragd Plus Build",artifact:"smaragd-plus-test-build"},
+ retronium:{key:"retronium",title:"Pokémon Retronium",repo:"domxx1/pokemon-retronium",branch:"feature/retro-platinum-restart",saveBranch:"cloud-saves",workflow:"Retronium Retro Platinum Base",artifact:"Pokemon-Retronium-Retro-Platinum-Basis"}
 };
 const $=id=>document.getElementById(id); let currentGame=null,romUrl=null,cloudTimer=null;
 const tokenInput=$("token"),ghStatus=$("ghStatus"),library=$("library"),libraryPanel=$("libraryPanel"),playerPanel=$("playerPanel"),game=$("game"),gameTitle=$("gameTitle"),saveStatus=$("saveStatus");
@@ -80,6 +80,37 @@ function token(){return sessionStorage.getItem("ghToken")||""}
 async function gh(url,opt={}){const t=token();if(!t)throw Error("Bitte zuerst mit GitHub verbinden.");const h={Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28",...(opt.headers||{}),Authorization:"Bearer "+t};const r=await fetch(url,{...opt,headers:h});if(!r.ok)throw Error("GitHub "+r.status+": "+(await r.text()).slice(0,180));return r}
 function b64(bytes){let s="",c=0x8000;for(let i=0;i<bytes.length;i+=c)s+=String.fromCharCode(...bytes.subarray(i,i+c));return btoa(s)}
 function unb64(s){const x=atob(s),a=new Uint8Array(x.length);for(let i=0;i<x.length;i++)a[i]=x.charCodeAt(i);return a}
+function projectForGame(game){
+ if(!game?.repo)return null;
+ return Object.values(PROJECTS).find(p=>p.repo===game.repo)||null;
+}
+async function cloudJsonGet(game,path){
+ const p=projectForGame(game);
+ if(!p||!token())return null;
+ const url="https://api.github.com/repos/"+p.repo+"/contents/"+path+"?ref="+encodeURIComponent(p.saveBranch);
+ try{
+  const r=await gh(url),j=await r.json();
+  const txt=decodeURIComponent(escape(atob((j.content||"").replace(/\n/g,""))));
+  return {data:JSON.parse(txt),sha:j.sha};
+ }catch(e){
+  if(String(e).includes("404"))return null;
+  throw e;
+ }
+}
+async function cloudJsonPut(game,path,data,message){
+ const p=projectForGame(game);
+ if(!p||!token())return false;
+ const existing=await cloudJsonGet(game,path);
+ const content=btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+ const body={message,content,branch:p.saveBranch};
+ if(existing?.sha)body.sha=existing.sha;
+ await gh("https://api.github.com/repos/"+p.repo+"/contents/"+path,{
+  method:"PUT",
+  headers:{"Content-Type":"application/json"},
+  body:JSON.stringify(body)
+ });
+ return true;
+}
 
 $("connect").onclick=async()=>{const t=tokenInput.value.trim();if(!t)return;sessionStorage.setItem("ghToken",t);try{const r=await gh("https://api.github.com/user");const u=await r.json();ghStatus.textContent="Verbunden als "+u.login+" · private Builds + Cloud-Saves aktiv";await refreshCloudLabels()}catch(e){sessionStorage.removeItem("ghToken");ghStatus.textContent=e.message}};
 $("disconnect").onclick=()=>{sessionStorage.removeItem("ghToken");tokenInput.value="";ghStatus.textContent="Nicht verbunden."};
@@ -105,9 +136,29 @@ async function render(){const rs=(await all(ROMS)).sort((a,b)=>(b.lastPlayed||b.
  for(const r of rs){const s=await one(SAVES,r.saveKey),d=document.createElement("div");d.className="game-card";const left=document.createElement("div"),act=document.createElement("div");act.className="actions";left.innerHTML='<div class="game-title"></div><div class="meta"></div>';left.firstChild.textContent=r.name.replace(/\.gba$/i,"");left.lastChild.textContent=(r.source==="github"?"GitHub "+(r.sha||"").slice(0,7):"lokal")+" · Save: "+(s?fmt(s.updatedAt):"noch keiner");
  const p=document.createElement("button");p.className="primary";p.textContent="Spielen";p.onclick=()=>startGame(r.id);const x=document.createElement("button");x.className="danger";x.textContent="Entfernen";x.onclick=async()=>{if(confirm("ROM lokal entfernen?")){await del(ROMS,r.id);render()}};act.append(p,x);d.append(left,act);library.append(d)}}
 
-async function cloudGet(key){if(!token())return null;try{const r=await gh("https://api.github.com/repos/"+SAVE_REPO+"/contents/cloud-saves/"+key+".json");const j=await r.json(),txt=decodeURIComponent(escape(atob(j.content.replace(/\n/g,"")))),data=JSON.parse(txt);return{...data,sha:j.sha}}catch(e){if(String(e).includes("404"))return null;throw e}}
-async function cloudPut(key,save){if(!token())return;const existing=await cloudGet(key),payload={key,updatedAt:save.updatedAt,buildSha:currentGame?.sha||null,save:b64(new Uint8Array(await save.bytes.arrayBuffer()))},body={message:"Sync GBA save: "+key,content:btoa(unescape(encodeURIComponent(JSON.stringify(payload))))};if(existing?.sha)body.sha=existing.sha;await gh("https://api.github.com/repos/"+SAVE_REPO+"/contents/cloud-saves/"+key+".json",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})}
-async function syncFromCloud(force=false){if(!currentGame||!token())return false;const c=await cloudGet(currentGame.saveKey);if(!c)return false;const l=await one(SAVES,currentGame.saveKey);if(force||!l||c.updatedAt>l.updatedAt){await put(SAVES,{key:currentGame.saveKey,bytes:new Blob([unb64(c.save)]),updatedAt:c.updatedAt,cloud:true});await updateSaveUI();return true}return false}
+async function cloudGet(key){
+ if(!currentGame)return null;
+ const r=await cloudJsonGet(currentGame,"emulator-saves/ingame-save.json");
+ if(!r)return null;
+ return {...r.data,sha:r.sha};
+}
+async function cloudPut(key,save){
+ if(!currentGame||!token())return;
+ const payload={key,updatedAt:save.updatedAt,buildSha:currentGame.sha||null,save:b64(new Uint8Array(await save.bytes.arrayBuffer()))};
+ await cloudJsonPut(currentGame,"emulator-saves/ingame-save.json",payload,"Sync GBA ingame save");
+}
+async function syncFromCloud(force=false){
+ if(!currentGame||!token())return false;
+ const c=await cloudGet(currentGame.saveKey);
+ if(!c)return false;
+ const l=await one(SAVES,currentGame.saveKey);
+ if(force||!l||c.updatedAt>l.updatedAt){
+   await put(SAVES,{key:currentGame.saveKey,bytes:new Blob([unb64(c.save)]),updatedAt:c.updatedAt,cloud:true});
+   await updateSaveUI();
+   return true;
+ }
+ return false;
+}
 async function injectLocalSave(){const s=await one(SAVES,currentGame.saveKey);if(!s?.bytes||!window.EJS_emulator?.gameManager)return;const gm=window.EJS_emulator.gameManager,bytes=new Uint8Array(await s.bytes.arrayBuffer());try{gm.FS.writeFile(gm.getSaveFilePath(),bytes);gm.loadSaveFiles();saveStatus.innerHTML='<span class="dot ok"></span>Save geladen: '+fmt(s.updatedAt)}catch(e){console.warn("Save konnte nicht injiziert werden",e)}}
 async function updateStateUI(){
  if(!currentGame)return;
@@ -115,7 +166,7 @@ async function updateStateUI(){
  const btn=$("stateLoadBtn");
  if(!st){
    $("stateStatus").innerHTML='<span class="dot"></span>Noch kein Save State';
-   btn.disabled=true;
+   btn.disabled=false;
    return;
  }
  const sameBuild=!currentGame.sha||!st.buildSha||st.buildSha===currentGame.sha;
@@ -124,32 +175,67 @@ async function updateStateUI(){
 }
 
 async function saveStateNow(){
- if(!currentGame) return;
+ if(!currentGame)return;
  const gm=window.EJS_emulator?.gameManager;
- if(!gm) throw Error("Emulator ist noch nicht bereit.");
+ if(!gm)throw Error("Emulator ist noch nicht bereit.");
  let data;
- try{ data=gm.getState(); }catch(e){ throw Error("Save State konnte nicht erzeugt werden: "+e.message); }
- if(!data || !data.length) throw Error("Der Emulator hat keinen Save State zurückgegeben.");
+ try{data=gm.getState();}catch(e){throw Error("Save State konnte nicht erzeugt werden: "+e.message);}
+ if(!data||!data.length)throw Error("Der Emulator hat keinen Save State zurückgegeben.");
  const bytes=data instanceof Uint8Array?data:new Uint8Array(data);
- await put(STATES,{key:currentGame.saveKey,bytes:new Blob([bytes],{type:"application/octet-stream"}),updatedAt:Date.now(),buildSha:currentGame.sha||null,contentHash:currentGame.contentHash||null});
- await updateStateUI();
+ const record={key:currentGame.saveKey,bytes:new Blob([bytes],{type:"application/octet-stream"}),updatedAt:Date.now(),buildSha:currentGame.sha||null,contentHash:currentGame.contentHash||null};
+ await put(STATES,record);
+ $("stateStatus").innerHTML='<span class="dot ok"></span>State lokal gespeichert · Cloud wird synchronisiert…';
+ if(token()&&projectForGame(currentGame)){
+   try{
+     await cloudJsonPut(currentGame,"emulator-saves/save-state.json",{
+       key:currentGame.saveKey,
+       updatedAt:record.updatedAt,
+       buildSha:record.buildSha,
+       contentHash:record.contentHash,
+       state:b64(bytes)
+     },"Sync emulator save state");
+     $("stateStatus").innerHTML='<span class="dot ok"></span>State lokal + Cloud: '+fmt(record.updatedAt);
+   }catch(e){
+     $("stateStatus").innerHTML='<span class="dot ok"></span>State lokal gespeichert · Cloud-Fehler';
+     throw Error("Lokal gespeichert, aber Cloud-Sync fehlgeschlagen: "+e.message);
+   }
+ }else{
+   await updateStateUI();
+ }
 }
-
 async function loadStateNow(){
- if(!currentGame) return;
+ if(!currentGame)return;
  const gm=window.EJS_emulator?.gameManager;
- if(!gm) throw Error("Emulator ist noch nicht bereit.");
- const st=await one(STATES,currentGame.saveKey);
- if(!st?.bytes) throw Error("Kein Save State vorhanden.");
+ if(!gm)throw Error("Emulator ist noch nicht bereit.");
+ let local=await one(STATES,currentGame.saveKey);
+ let cloud=null;
+ if(token()&&projectForGame(currentGame)){
+   const r=await cloudJsonGet(currentGame,"emulator-saves/save-state.json");
+   if(r?.data?.state){
+     cloud={
+       key:currentGame.saveKey,
+       bytes:new Blob([unb64(r.data.state)],{type:"application/octet-stream"}),
+       updatedAt:r.data.updatedAt||0,
+       buildSha:r.data.buildSha||null,
+       contentHash:r.data.contentHash||null,
+       cloud:true
+     };
+   }
+ }
+ let st=local;
+ if(cloud&&(!local||cloud.updatedAt>local.updatedAt)){
+   st=cloud;
+   await put(STATES,cloud);
+ }
+ if(!st?.bytes)throw Error("Kein lokaler oder Cloud-Save-State vorhanden.");
  if(st.buildSha&&currentGame.sha&&st.buildSha!==currentGame.sha){
    const ok=confirm("Dieser Save State stammt aus einem anderen ROM-Build ("+st.buildSha.slice(0,7)+" statt "+currentGame.sha.slice(0,7)+"). Laden kann abstürzen oder Fehler verursachen. Trotzdem laden?");
    if(!ok)return;
  }
  const bytes=new Uint8Array(await st.bytes.arrayBuffer());
- try{ gm.loadState(bytes); }catch(e){ throw Error("Save State konnte nicht geladen werden: "+e.message); }
- $("stateStatus").innerHTML='<span class="dot ok"></span>State geladen: '+fmt(st.updatedAt);
+ try{gm.loadState(bytes);}catch(e){throw Error("Save State konnte nicht geladen werden: "+e.message);}
+ $("stateStatus").innerHTML='<span class="dot ok"></span>'+(st.cloud?"Cloud-State":"Lokaler State")+" geladen: "+fmt(st.updatedAt);
 }
-
 async function updateSaveUI(){if(!currentGame)return;const s=await one(SAVES,currentGame.saveKey);$("downloadSaveBtn").disabled=!s;saveStatus.innerHTML=s?'<span class="dot ok"></span>Save: '+fmt(s.updatedAt)+(token()?" · Cloud aktiv":" · nur lokal"):'<span class="dot"></span>Noch kein Save erkannt'}
 
 function cleanup(){if(romUrl)URL.revokeObjectURL(romUrl);romUrl=null;game.innerHTML="";document.getElementById("ejs-loader")?.remove()}
