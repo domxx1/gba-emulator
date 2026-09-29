@@ -238,10 +238,11 @@ document.querySelectorAll(".projectBtn").forEach(b=>b.onclick=()=>loadProject(b.
   $("smaragdStatus").textContent="Basis-ROM gespeichert · SHA-256 "+hash.slice(0,12)+".";
   await render();
  }
- function applyIps32(base,patch){
+ function applyIps32(base,patch,patchTargetSize){
   const p=new Uint8Array(patch),b=new Uint8Array(base),header="IPS32";
   if(p.length<9||!header.split("").every((v,i)=>p[i]===v.charCodeAt(0)))throw Error("Ungültiger IPS32-Patch.");
-  const out=new Uint8Array(b);let i=5,ended=false;
+  if(!Number.isInteger(patchTargetSize)||patchTargetSize<b.length||patchTargetSize>32*1024*1024)throw Error("Ungültige Zielgröße im Patch-Metadatensatz.");
+  const out=new Uint8Array(patchTargetSize||b.length);out.fill(0xff);out.set(b);let i=5,ended=false;
   const read32=()=>{if(i+4>p.length)throw Error("Patch abgeschnitten.");const n=(p[i]*0x1000000)+(p[i+1]<<16)+(p[i+2]<<8)+p[i+3];i+=4;return n>>>0};
   while(i<p.length){
    if(i+4<=p.length&&p[i]===69&&p[i+1]===69&&p[i+2]===79&&p[i+3]===70){i+=4;ended=true;break}
@@ -256,10 +257,10 @@ document.querySelectorAll(".projectBtn").forEach(b=>b.onclick=()=>loadProject(b.
  }
  async function installPatch(patch,meta){
   const base=await one(ROMS,BASE_ID);if(!base?.blob)throw Error("Bitte zuerst die passende Basis-ROM hinterlegen.");
-  if(!meta?.baseSha256||!meta?.resultSha256||!meta?.name)throw Error("Patch-Metadaten mit Basis- und Ergebnis-Prüfsumme fehlen.");
+  if(!meta?.baseSha256||!meta?.resultSha256||!meta?.name||!meta?.resultSize)throw Error("Patch-Metadaten mit Basis- und Ergebnis-Prüfsumme sowie Zielgröße fehlen.");
   if(base.contentHash.toLowerCase()!==meta.baseSha256.toLowerCase())throw Error("Falsche Basis-ROM: SHA-256 stimmt nicht überein.");
   if(meta.patchSha256&&(await sha256(patch)).toLowerCase()!==meta.patchSha256.toLowerCase())throw Error("Patch-Prüfsumme stimmt nicht.");
-  const result=new Blob([applyIps32(await base.blob.arrayBuffer(),await patch.arrayBuffer())],{type:"application/octet-stream"});
+  const result=new Blob([applyIps32(await base.blob.arrayBuffer(),await patch.arrayBuffer(),meta.resultSize)],{type:"application/octet-stream"});
   const hash=await sha256(result);if(hash.toLowerCase()!==meta.resultSha256.toLowerCase())throw Error("Ergebnis-Prüfsumme stimmt nicht; ROM wurde nicht gespeichert.");
   const id=PROJECTS.smaragd.key+":"+hash,old=await one(ROMS,id);
   await put(ROMS,{id,saveKey:PROJECTS.smaragd.key,name:meta.name.replace(/\.ips32$/i,"")+".gba",blob:result,source:"patch",repo:PROJECTS.smaragd.repo,sha:meta.commit||null,contentHash:hash,addedAt:old?.addedAt||Date.now(),lastPlayed:old?.lastPlayed||0});
@@ -300,7 +301,7 @@ document.querySelectorAll(".projectBtn").forEach(b=>b.onclick=()=>loadProject(b.
  document.querySelectorAll(".projectRomInput").forEach(input=>input.onchange=async e=>{const p=PROJECTS[input.dataset.project],files=[...e.target.files].filter(f=>/\.gba$/i.test(f.name)),st=$(input.dataset.project+"Status");try{if(!files.length)throw Error("Bitte eine .gba-Datei wählen.");for(const f of files){const hash=await sha256(f),id=p.key+":"+hash;const old=await one(ROMS,id);await put(ROMS,{id,saveKey:p.key,name:f.name,blob:f.slice(0,f.size,"application/octet-stream"),source:"manual",repo:p.repo,branch:p.branch,contentHash:hash,addedAt:old?.addedAt||Date.now(),lastPlayed:old?.lastPlayed||0})}st.textContent=files.length+" Testbuild(s) importiert. Ältere Versionen bleiben in der Bibliothek.";await render();}catch(err){st.textContent="Fehler: "+err.message}finally{input.value=""}});
 
 $("romInput").onchange=async e=>{for(const f of [...e.target.files]){if(!/\.gba$/i.test(f.name))continue;const id=await sha256(f),old=await one(ROMS,id);await put(ROMS,{id,saveKey:id,name:f.name,blob:f.slice(0,f.size,"application/octet-stream"),source:"local",addedAt:old?.addedAt||Date.now(),lastPlayed:old?.lastPlayed||0})}e.target.value="";render()};
-async function render(){const rs=(await all(ROMS)).sort((a,b)=>(b.lastPlayed||b.buildTime||b.addedAt)-(a.lastPlayed||a.buildTime||a.addedAt));library.innerHTML="";if(!rs.length){library.innerHTML='<div class="empty">Noch keine ROM in der lokalen Bibliothek.</div>';return}
+async function render(){const rs=(await all(ROMS)).filter(r=>r.source!=="base").sort((a,b)=>(b.lastPlayed||b.buildTime||b.addedAt)-(a.lastPlayed||a.buildTime||a.addedAt));library.innerHTML="";if(!rs.length){library.innerHTML='<div class="empty">Noch keine ROM in der lokalen Bibliothek.</div>';return}
  for(const r of rs){const s=await one(SAVES,r.saveKey),d=document.createElement("div");d.className="game-card";const left=document.createElement("div"),act=document.createElement("div");act.className="actions";left.innerHTML='<div class="game-title"></div><div class="meta"></div>';left.firstChild.textContent=r.name.replace(/\.gba$/i,"");left.lastChild.textContent=(r.source==="github"?"GitHub "+(r.sha||"").slice(0,7):r.source==="manual"?"Testbuild "+(r.contentHash||"").slice(0,7):"lokal")+" · Save: "+(s?fmt(s.updatedAt):"noch keiner");
  const p=document.createElement("button");p.className="primary";p.textContent="Spielen";p.onclick=()=>startGame(r.id);const x=document.createElement("button");x.className="danger";x.textContent="Entfernen";x.onclick=async()=>{if(confirm("ROM lokal entfernen?")){await del(ROMS,r.id);render()}};act.append(p,x);d.append(left,act);library.append(d)}}
 
