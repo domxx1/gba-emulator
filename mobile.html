@@ -14,18 +14,19 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 .game-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.game-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meta{font-size:.75rem;margin-top:3px}.hidden{display:none!important}
 #game{width:100%;aspect-ratio:4/3;background:#000;border-radius:12px;overflow:hidden;min-height:280px}#game canvas{max-width:100%!important;max-height:100%!important}
 .savebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.save-status{flex:1;min-width:200px;font-size:.8rem;color:var(--muted)}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--warn)}.dot.ok{background:var(--ok)}
-.status{margin-top:8px;font-size:.8rem;color:var(--muted);min-height:1.2em}.empty{text-align:center;padding:15px;color:var(--muted);border:1px dashed var(--line);border-radius:10px}
+.status{margin-top:8px;font-size:.8rem;color:var(--muted);min-height:1.2em}.empty{text-align:center;padding:15px;color:var(--muted);border:1px dashed var(--line);border-radius:10px}.rememberRow{display:flex;align-items:center;gap:8px;margin:2px 0 10px;color:var(--muted);font-size:.84rem}.rememberRow input{width:auto;margin:0}
 @media(max-width:680px){.projects{grid-template-columns:1fr}.game-card{grid-template-columns:1fr}.game-card .actions button{flex:1}.panel{padding:10px}body{padding:8px}#game{min-height:250px}}
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.6 · Cloud States</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.7 · Gerätetoken</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
-<div class="muted">Für private Builds und Cloud-Saves. Der Token bleibt nur bis zum Schließen des Browser-Tabs gespeichert.</div>
+<div class="muted">Für private Builds und Cloud-Saves. Optional kann der Token dauerhaft auf diesem Gerät gespeichert werden.</div>
 <input id="token" type="password" autocomplete="off" placeholder="Fine-grained GitHub Token">
-<div class="actions"><button id="connect" class="primary">Verbinden</button><button id="disconnect">Trennen</button></div>
+<label class="rememberRow"><input id="rememberToken" type="checkbox"> Token auf diesem Gerät speichern</label>
+<div class="actions"><button id="connect" class="primary">Verbinden</button><button id="disconnect">Trennen</button><button id="forgetToken">Gespeicherten Token löschen</button></div>
 <div id="ghStatus" class="status">Nicht verbunden.</div>
 </section>
 
@@ -67,7 +68,11 @@ const PROJECTS={
 };
 const $=id=>document.getElementById(id); let currentGame=null,romUrl=null,cloudTimer=null;
 const tokenInput=$("token"),ghStatus=$("ghStatus"),library=$("library"),libraryPanel=$("libraryPanel"),playerPanel=$("playerPanel"),game=$("game"),gameTitle=$("gameTitle"),saveStatus=$("saveStatus");
-tokenInput.value=sessionStorage.getItem("ghToken")||"";
+const rememberToken=$("rememberToken");
+const storedToken=localStorage.getItem("ghTokenPersistent")||"";
+const sessionToken=sessionStorage.getItem("ghToken")||"";
+tokenInput.value=storedToken||sessionToken;
+rememberToken.checked=!!storedToken;
 
 function openDb(){return new Promise((ok,no)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains(ROMS))d.createObjectStore(ROMS,{keyPath:"id"});if(!d.objectStoreNames.contains(SAVES))d.createObjectStore(SAVES,{keyPath:"key"});if(!d.objectStoreNames.contains(STATES))d.createObjectStore(STATES,{keyPath:"key"})};r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
 async function all(s){const d=await openDb();return new Promise((ok,no)=>{const r=d.transaction(s,"readonly").objectStore(s).getAll();r.onsuccess=()=>ok(r.result||[]);r.onerror=()=>no(r.error)})}
@@ -76,7 +81,7 @@ async function put(s,v){const d=await openDb();return new Promise((ok,no)=>{cons
 async function del(s,k){const d=await openDb();return new Promise((ok,no)=>{const t=d.transaction(s,"readwrite");t.objectStore(s).delete(k);t.oncomplete=()=>ok();t.onerror=()=>no(t.error)})}
 async function sha256(blob){const a=await blob.arrayBuffer(),h=await crypto.subtle.digest("SHA-256",a);return[...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,"0")).join("")}
 function fmt(t){return t?new Intl.DateTimeFormat("de-DE",{dateStyle:"short",timeStyle:"short"}).format(new Date(t)):"noch nie"}
-function token(){return sessionStorage.getItem("ghToken")||""}
+function token(){return localStorage.getItem("ghTokenPersistent")||sessionStorage.getItem("ghToken")||""}
 async function gh(url,opt={}){const t=token();if(!t)throw Error("Bitte zuerst mit GitHub verbinden.");const h={Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28",...(opt.headers||{}),Authorization:"Bearer "+t};const r=await fetch(url,{...opt,headers:h});if(!r.ok)throw Error("GitHub "+r.status+": "+(await r.text()).slice(0,180));return r}
 function b64(bytes){let s="",c=0x8000;for(let i=0;i<bytes.length;i+=c)s+=String.fromCharCode(...bytes.subarray(i,i+c));return btoa(s)}
 function unb64(s){const x=atob(s),a=new Uint8Array(x.length);for(let i=0;i<x.length;i++)a[i]=x.charCodeAt(i);return a}
@@ -112,8 +117,38 @@ async function cloudJsonPut(game,path,data,message){
  return true;
 }
 
-$("connect").onclick=async()=>{const t=tokenInput.value.trim();if(!t)return;sessionStorage.setItem("ghToken",t);try{const r=await gh("https://api.github.com/user");const u=await r.json();ghStatus.textContent="Verbunden als "+u.login+" · private Builds + Cloud-Saves aktiv";await refreshCloudLabels()}catch(e){sessionStorage.removeItem("ghToken");ghStatus.textContent=e.message}};
-$("disconnect").onclick=()=>{sessionStorage.removeItem("ghToken");tokenInput.value="";ghStatus.textContent="Nicht verbunden."};
+$("connect").onclick=async()=>{
+ const t=tokenInput.value.trim();
+ if(!t)return;
+ if(rememberToken.checked){
+   localStorage.setItem("ghTokenPersistent",t);
+   sessionStorage.removeItem("ghToken");
+ }else{
+   sessionStorage.setItem("ghToken",t);
+   localStorage.removeItem("ghTokenPersistent");
+ }
+ try{
+   const r=await gh("https://api.github.com/user");
+   const u=await r.json();
+   ghStatus.textContent="Verbunden als "+u.login+(rememberToken.checked?" · Token auf diesem Gerät gespeichert":" · nur für diese Sitzung")+" · private Builds + Cloud-Saves aktiv";
+   await refreshCloudLabels();
+ }catch(e){
+   sessionStorage.removeItem("ghToken");
+   if(!rememberToken.checked)localStorage.removeItem("ghTokenPersistent");
+   ghStatus.textContent=e.message;
+ }
+};
+$("disconnect").onclick=()=>{
+ sessionStorage.removeItem("ghToken");
+ ghStatus.textContent=localStorage.getItem("ghTokenPersistent")?"Verbindung getrennt · gespeicherter Gerätetoken bleibt erhalten.":"Nicht verbunden.";
+};
+$("forgetToken").onclick=()=>{
+ localStorage.removeItem("ghTokenPersistent");
+ sessionStorage.removeItem("ghToken");
+ tokenInput.value="";
+ rememberToken.checked=false;
+ ghStatus.textContent="Gespeicherter Token wurde von diesem Gerät entfernt.";
+};
 async function refreshCloudLabels(){for(const [id,p] of Object.entries(PROJECTS)){try{const r=await latestRun(p);$(id+"Status").textContent="Letzter erfolgreicher Build: "+r.head_sha.slice(0,7)+" · "+fmt(r.created_at)}catch(e){$(id+"Status").textContent=e.message}}}
 async function latestRun(p){const u="https://api.github.com/repos/"+p.repo+"/actions/runs?branch="+encodeURIComponent(p.branch)+"&status=success&per_page=30";const j=await (await gh(u)).json();const r=(j.workflow_runs||[]).find(x=>x.name===p.workflow);if(!r)throw Error("Kein erfolgreicher Build gefunden.");return r}
 async function loadProject(id){
