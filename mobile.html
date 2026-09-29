@@ -16,7 +16,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 .stateManager{margin:10px 0 12px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#111722}
 .stateSectionTitle{font-size:.72rem;font-weight:900;letter-spacing:.08em;color:var(--muted);margin:2px 0 7px}
 .stateButtons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.stateButtons button{width:100%}.stateButtons.load button{background:#1d4f72;border-color:#286b97}.stateButtons.save{margin-top:6px}.stateButtons.save button{background:#2a2024;border-color:#5a343d;color:#ffd9df}
+.stateButtons button{width:100%}a.file{text-decoration:none;display:inline-block}.stateButtons.load button{background:#1d4f72;border-color:#286b97}.stateButtons.save{margin-top:6px}.stateButtons.save button{background:#2a2024;border-color:#5a343d;color:#ffd9df}
 .stateDivider{height:1px;background:var(--line);margin:12px 0}
 .slotMeta{font-size:.72rem;color:var(--muted);margin-top:7px;min-height:1.1em}
 .savebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.save-status{flex:1;min-width:200px;font-size:.8rem;color:var(--muted)}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--warn)}.dot.ok{background:var(--ok)}
@@ -26,7 +26,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.8 · 3 State-Slots</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.9 · Testbuilds</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -40,8 +40,8 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 <section id="libraryPanel" class="panel">
 <h2>Unsere aktuellen Builds</h2>
 <div class="projects">
- <div class="card"><strong>Pokémon Smaragd Plus</strong><div class="meta">feature/overworld-encounters · neuester erfolgreicher Build</div><button class="primary projectBtn" data-project="smaragd">Neueste Version laden</button><div id="smaragdStatus" class="status"></div></div>
- <div class="card"><strong>Pokémon Retronium</strong><div class="meta">feature/retro-platinum-restart · neuester erfolgreicher Build</div><button class="primary projectBtn" data-project="retronium">Neueste Version laden</button><div id="retroniumStatus" class="status"></div></div>
+ <div class="card"><strong>Pokémon Smaragd Plus</strong><div class="meta">feature/overworld-encounters · Test-GBA aus Drive auswählen</div><div class="actions"><a class="file" href="https://drive.google.com/drive/folders/1Mgl_f3NZuXKzYCkYfuj4zGo9ja2_Gb0l" target="_blank" rel="noopener">Drive-Testbuilds</a><label class="file primary">GBA importieren<input class="projectRomInput" data-project="smaragd" type="file" accept=".gba,application/octet-stream" multiple></label><button class="projectBtn" data-project="smaragd">GitHub-Build laden</button></div><div id="smaragdStatus" class="status">GBA aus Drive herunterladen und hier importieren. Ältere Testbuilds bleiben auswählbar.</div></div>
+ <div class="card"><strong>Pokémon Retronium</strong><div class="meta">feature/retro-platinum-restart · Test-GBA importieren</div><div class="actions"><label class="file primary">GBA importieren<input class="projectRomInput" data-project="retronium" type="file" accept=".gba,application/octet-stream" multiple></label><button class="projectBtn" data-project="retronium">GitHub-Build laden</button></div><div id="retroniumStatus" class="status"></div></div>
 </div>
 <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
 <div class="row"><h2 style="margin:0">Lokale Bibliothek</h2><label class="file primary">+ GBA hinzufügen<input id="romInput" type="file" accept=".gba,application/octet-stream" multiple></label></div>
@@ -164,7 +164,7 @@ $("forgetToken").onclick=()=>{
  ghStatus.textContent="Gespeicherter Token wurde von diesem Gerät entfernt.";
 };
 async function refreshCloudLabels(){for(const [id,p] of Object.entries(PROJECTS)){try{const r=await latestRun(p);$(id+"Status").textContent="Letzter erfolgreicher Build: "+r.head_sha.slice(0,7)+" · "+fmt(r.created_at)}catch(e){$(id+"Status").textContent=e.message}}}
-async function latestRun(p){const u="https://api.github.com/repos/"+p.repo+"/actions/runs?branch="+encodeURIComponent(p.branch)+"&status=success&per_page=30";const j=await (await gh(u)).json();const r=(j.workflow_runs||[]).find(x=>x.name===p.workflow);if(!r)throw Error("Kein erfolgreicher Build gefunden.");return r}
+async function latestRun(p){const head=await (await gh("https://api.github.com/repos/"+p.repo+"/branches/"+encodeURIComponent(p.branch))).json();const u="https://api.github.com/repos/"+p.repo+"/actions/runs?branch="+encodeURIComponent(p.branch)+"&status=success&per_page=30";const j=await (await gh(u)).json();const r=(j.workflow_runs||[]).find(x=>x.name===p.workflow&&x.head_sha===head.commit.sha);if(!r)throw Error("Kein erfolgreicher GitHub-Build für den aktuellen Commit. Test-GBA importieren.");return r}
 async function loadProject(id){
  const p=PROJECTS[id],st=$(id+"Status");try{
   st.textContent="Suche neuesten Build…";const run=await latestRun(p);
@@ -179,10 +179,11 @@ async function loadProject(id){
  }catch(e){console.error(e);st.textContent="Fehler: "+e.message}
 }
 document.querySelectorAll(".projectBtn").forEach(b=>b.onclick=()=>loadProject(b.dataset.project));
+ document.querySelectorAll(".projectRomInput").forEach(input=>input.onchange=async e=>{const p=PROJECTS[input.dataset.project],files=[...e.target.files].filter(f=>/\.gba$/i.test(f.name)),st=$(input.dataset.project+"Status");try{if(!files.length)throw Error("Bitte eine .gba-Datei wählen.");for(const f of files){const hash=await sha256(f),id=p.key+":"+hash;const old=await one(ROMS,id);await put(ROMS,{id,saveKey:p.key,name:f.name,blob:f.slice(0,f.size,"application/octet-stream"),source:"manual",repo:p.repo,branch:p.branch,contentHash:hash,addedAt:old?.addedAt||Date.now(),lastPlayed:old?.lastPlayed||0})}st.textContent=files.length+" Testbuild(s) importiert. Ältere Versionen bleiben in der Bibliothek.";await render();}catch(err){st.textContent="Fehler: "+err.message}finally{input.value=""}});
 
 $("romInput").onchange=async e=>{for(const f of [...e.target.files]){if(!/\.gba$/i.test(f.name))continue;const id=await sha256(f),old=await one(ROMS,id);await put(ROMS,{id,saveKey:id,name:f.name,blob:f.slice(0,f.size,"application/octet-stream"),source:"local",addedAt:old?.addedAt||Date.now(),lastPlayed:old?.lastPlayed||0})}e.target.value="";render()};
 async function render(){const rs=(await all(ROMS)).sort((a,b)=>(b.lastPlayed||b.buildTime||b.addedAt)-(a.lastPlayed||a.buildTime||a.addedAt));library.innerHTML="";if(!rs.length){library.innerHTML='<div class="empty">Noch keine ROM in der lokalen Bibliothek.</div>';return}
- for(const r of rs){const s=await one(SAVES,r.saveKey),d=document.createElement("div");d.className="game-card";const left=document.createElement("div"),act=document.createElement("div");act.className="actions";left.innerHTML='<div class="game-title"></div><div class="meta"></div>';left.firstChild.textContent=r.name.replace(/\.gba$/i,"");left.lastChild.textContent=(r.source==="github"?"GitHub "+(r.sha||"").slice(0,7):"lokal")+" · Save: "+(s?fmt(s.updatedAt):"noch keiner");
+ for(const r of rs){const s=await one(SAVES,r.saveKey),d=document.createElement("div");d.className="game-card";const left=document.createElement("div"),act=document.createElement("div");act.className="actions";left.innerHTML='<div class="game-title"></div><div class="meta"></div>';left.firstChild.textContent=r.name.replace(/\.gba$/i,"");left.lastChild.textContent=(r.source==="github"?"GitHub "+(r.sha||"").slice(0,7):r.source==="manual"?"Testbuild "+(r.contentHash||"").slice(0,7):"lokal")+" · Save: "+(s?fmt(s.updatedAt):"noch keiner");
  const p=document.createElement("button");p.className="primary";p.textContent="Spielen";p.onclick=()=>startGame(r.id);const x=document.createElement("button");x.className="danger";x.textContent="Entfernen";x.onclick=async()=>{if(confirm("ROM lokal entfernen?")){await del(ROMS,r.id);render()}};act.append(p,x);d.append(left,act);library.append(d)}}
 
 async function cloudGet(key){
@@ -304,8 +305,8 @@ async function loadStateNow(slot){
  if(!gm)throw Error("Emulator ist noch nicht bereit.");
  const st=await newestSlot(slot);
  if(!st?.bytes)throw Error("Slot "+slot+" ist leer.");
- if(st.buildSha&&currentGame.sha&&st.buildSha!==currentGame.sha){
-   const ok=confirm("Slot "+slot+" stammt aus einem anderen ROM-Build ("+st.buildSha.slice(0,7)+" statt "+currentGame.sha.slice(0,7)+"). Trotzdem laden?");
+ if((st.contentHash&&currentGame.contentHash&&st.contentHash!==currentGame.contentHash)||(!st.contentHash&&st.buildSha&&currentGame.sha&&st.buildSha!==currentGame.sha)){
+   const ok=confirm("Slot "+slot+" stammt aus einem anderen ROM-Build. Save States können zwischen Versionen inkompatibel sein. Trotzdem laden?");
    if(!ok)return;
  }
  const bytes=new Uint8Array(await st.bytes.arrayBuffer());
