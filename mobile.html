@@ -1,332 +1,116 @@
 <!doctype html>
 <html lang="de">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0d1017">
-<title>GBA Cloud</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d1017"><title>GBA Cloud</title>
 <style>
-*{box-sizing:border-box}
-:root{--bg:#0d1017;--panel:#161b26;--panel2:#202735;--line:#2c3545;--text:#f6f7fb;--muted:#98a4b5;--accent:#38bdf8;--ok:#4ade80;--warn:#fbbf24;--danger:#ef4444}
-html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-body{padding:14px;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(14px,env(safe-area-inset-bottom))}
-.wrap{max-width:950px;margin:auto}
-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
-h1{font-size:1.45rem;margin:0} h2{font-size:1.05rem;margin:0 0 12px}
-.badge{font-size:.72rem;border:1px solid var(--line);background:var(--panel);padding:6px 9px;border-radius:999px;color:var(--muted)}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:14px;margin-bottom:12px}
-.actions{display:flex;gap:8px;flex-wrap:wrap}
-button,.file{border:0;border-radius:10px;padding:10px 13px;font:inherit;font-weight:700;cursor:pointer}
-button{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
-button.primary,.file.primary{background:var(--accent);color:#04131c;border:0}
-button.danger{color:#fecaca;background:#35191b}
-button:disabled{opacity:.4;cursor:not-allowed}
-.file input{display:none}
-.muted{color:var(--muted);font-size:.85rem}
-.library{display:grid;gap:8px;margin-top:12px}
-.game-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px;background:#111722;border:1px solid var(--line);border-radius:12px}
-.game-title{font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.meta{font-size:.76rem;color:var(--muted);margin-top:3px}
-.card-buttons{display:flex;gap:6px}
-.card-buttons button{padding:8px 10px}
-.player-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
-#game{width:100%;aspect-ratio:4/3;background:#000;border-radius:12px;overflow:hidden;min-height:280px}
-#game canvas{max-width:100%!important;max-height:100%!important}
-.savebar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
-.save-status{flex:1;min-width:190px;font-size:.8rem;color:var(--muted)}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--warn)}
-.dot.ok{background:var(--ok)}
-.empty{text-align:center;padding:18px;color:var(--muted);border:1px dashed var(--line);border-radius:12px}
-.note{font-size:.76rem;color:var(--muted);line-height:1.45}
-.hidden{display:none!important}
-@media(max-width:650px){
-  body{padding-left:9px;padding-right:9px}
-  .panel{padding:11px;border-radius:12px}
-  .game-card{grid-template-columns:1fr}
-  .card-buttons button{flex:1}
-  .card-buttons{width:100%}
-  #game{min-height:260px}
-}
+*{box-sizing:border-box}:root{--bg:#0d1017;--panel:#161b26;--p2:#202735;--line:#2c3545;--text:#f6f7fb;--muted:#98a4b5;--accent:#38bdf8;--ok:#4ade80;--warn:#fbbf24;--bad:#ef4444}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}body{padding:12px}.wrap{max-width:960px;margin:auto}
+header,.row,.player-head{display:flex;align-items:center;justify-content:space-between;gap:10px}header{margin-bottom:12px}h1{font-size:1.45rem;margin:0}h2{font-size:1.05rem;margin:0 0 10px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:11px}.badge,.pill{font-size:.72rem;border:1px solid var(--line);background:var(--p2);padding:6px 9px;border-radius:999px;color:var(--muted)}
+button,.file,input{border-radius:10px;font:inherit}button,.file{border:1px solid var(--line);background:var(--p2);color:var(--text);padding:10px 12px;font-weight:700;cursor:pointer}button.primary,.file.primary{background:var(--accent);color:#04131c;border:0}button.danger{color:#fecaca;background:#35191b}button:disabled{opacity:.42;cursor:not-allowed}.file input{display:none}
+input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid var(--line);color:var(--text);margin:8px 0}.muted,.meta,.note{color:var(--muted)}.muted{font-size:.84rem}.note{font-size:.76rem;line-height:1.45}
+.projects,.library{display:grid;gap:8px}.projects{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:10px}.card,.game-card{background:#111722;border:1px solid var(--line);border-radius:12px;padding:11px}.card strong,.game-title{font-weight:800}.card .meta{font-size:.76rem;margin:4px 0 10px}.actions{display:flex;gap:7px;flex-wrap:wrap}.actions>*{flex:0 0 auto}
+.game-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.game-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meta{font-size:.75rem;margin-top:3px}.hidden{display:none!important}
+#game{width:100%;aspect-ratio:4/3;background:#000;border-radius:12px;overflow:hidden;min-height:280px}#game canvas{max-width:100%!important;max-height:100%!important}
+.savebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.save-status{flex:1;min-width:200px;font-size:.8rem;color:var(--muted)}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--warn)}.dot.ok{background:var(--ok)}
+.status{margin-top:8px;font-size:.8rem;color:var(--muted);min-height:1.2em}.empty{text-align:center;padding:15px;color:var(--muted);border:1px dashed var(--line);border-radius:10px}
+@media(max-width:680px){.projects{grid-template-columns:1fr}.game-card{grid-template-columns:1fr}.game-card .actions button{flex:1}.panel{padding:10px}body{padding:8px}#game{min-height:250px}}
 </style>
 </head>
-<body>
-<div class="wrap">
-<header>
-  <h1>GBA Cloud</h1>
-  <span class="badge">v0.2 · lokal</span>
-</header>
+<body><div class="wrap">
+<header><h1>GBA Cloud</h1><span class="badge">v0.3 · GitHub</span></header>
+
+<section class="panel">
+<h2>GitHub-Verbindung</h2>
+<div class="muted">Für private Builds und Cloud-Saves. Der Token bleibt nur bis zum Schließen des Browser-Tabs gespeichert.</div>
+<input id="token" type="password" autocomplete="off" placeholder="Fine-grained GitHub Token">
+<div class="actions"><button id="connect" class="primary">Verbinden</button><button id="disconnect">Trennen</button></div>
+<div id="ghStatus" class="status">Nicht verbunden.</div>
+</section>
 
 <section id="libraryPanel" class="panel">
-  <h2>Spielebibliothek</h2>
-  <div class="actions">
-    <label class="file primary">+ GBA hinzufügen<input id="romInput" type="file" accept=".gba,application/octet-stream" multiple></label>
-  </div>
-  <div id="library" class="library"></div>
+<h2>Unsere aktuellen Builds</h2>
+<div class="projects">
+ <div class="card"><strong>Pokémon Smaragd Plus</strong><div class="meta">feature/overworld-encounters · neuester erfolgreicher Build</div><button class="primary projectBtn" data-project="smaragd">Neueste Version laden</button><div id="smaragdStatus" class="status"></div></div>
+ <div class="card"><strong>Pokémon Retronium</strong><div class="meta">feature/retro-platinum-restart · neuester erfolgreicher Build</div><button class="primary projectBtn" data-project="retronium">Neueste Version laden</button><div id="retroniumStatus" class="status"></div></div>
+</div>
+<hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+<div class="row"><h2 style="margin:0">Lokale Bibliothek</h2><label class="file primary">+ GBA hinzufügen<input id="romInput" type="file" accept=".gba,application/octet-stream" multiple></label></div>
+<div id="library" class="library" style="margin-top:10px"></div>
 </section>
 
 <section id="playerPanel" class="panel hidden">
-  <div class="player-head">
-    <div>
-      <div class="muted">AKTIVES SPIEL</div>
-      <strong id="gameTitle">Game Boy Advance</strong>
-    </div>
-    <button id="backBtn">← Bibliothek</button>
-  </div>
-
-  <div id="game"></div>
-
-  <div class="savebar">
-    <div id="saveStatus" class="save-status"><span class="dot"></span>Noch kein Save erkannt</div>
-    <button id="downloadSaveBtn" disabled>Save herunterladen</button>
-  </div>
+<div class="player-head"><div><div class="muted">AKTIVES SPIEL</div><strong id="gameTitle">Game Boy Advance</strong></div><button id="backBtn">← Bibliothek</button></div>
+<div id="game"></div>
+<div class="savebar"><div id="saveStatus" class="save-status"><span class="dot"></span>Noch kein Save erkannt</div><button id="cloudPullBtn">Cloud laden</button><button id="cloudPushBtn">Cloud speichern</button><button id="downloadSaveBtn" disabled>Save herunterladen</button></div>
 </section>
 
-<section class="panel">
-  <h2>Speicherstände</h2>
-  <div class="note">
-    Normale Ingame-Saves werden von EmulatorJS im Browser gespeichert. Zusätzlich legt diese WebApp bei jeder erkannten Save-Änderung eine lokale Sicherung an. So haben wir die Grundlage, diese Sicherungen im nächsten Schritt zwischen PC und Smartphone zu synchronisieren.
-  </div>
-</section>
+<section class="panel"><h2>Speicherstand</h2><div class="note">Jedes Projekt verwendet einen stabilen Save-Schlüssel. Dadurch bleibt derselbe Spielstand auch bei einer neueren ROM-Version erhalten. Bei GitHub-Verbindung wird ein erkannter Ingame-Save zusätzlich privat im Repository <b>domxx1/gba-emulator</b> unter <code>cloud-saves/</code> gesichert.</div></section>
 </div>
-
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
-const DB_NAME="gba-cloud-v02";
-const ROM_STORE="roms";
-const SAVE_STORE="saves";
+const DB="gba-cloud-v03", ROMS="roms", SAVES="saves", SAVE_REPO="domxx1/gba-emulator";
+const PROJECTS={
+ smaragd:{key:"smaragd-plus",title:"Pokémon Smaragd Plus",repo:"domxx1/pokemon-smaragd-plus",branch:"feature/overworld-encounters",workflow:"Smaragd Plus Build",artifact:"smaragd-plus-test-build"},
+ retronium:{key:"retronium",title:"Pokémon Retronium",repo:"domxx1/pokemon-retronium",branch:"feature/retro-platinum-restart",workflow:"Retronium Retro Platinum Base",artifact:"Pokemon-Retronium-Retro-Platinum-Basis"}
+};
+const $=id=>document.getElementById(id); let currentGame=null,romUrl=null,cloudTimer=null;
+const tokenInput=$("token"),ghStatus=$("ghStatus"),library=$("library"),libraryPanel=$("libraryPanel"),playerPanel=$("playerPanel"),game=$("game"),gameTitle=$("gameTitle"),saveStatus=$("saveStatus");
+tokenInput.value=sessionStorage.getItem("ghToken")||"";
 
-const romInput=document.getElementById("romInput");
-const library=document.getElementById("library");
-const libraryPanel=document.getElementById("libraryPanel");
-const playerPanel=document.getElementById("playerPanel");
-const game=document.getElementById("game");
-const gameTitle=document.getElementById("gameTitle");
-const backBtn=document.getElementById("backBtn");
-const saveStatus=document.getElementById("saveStatus");
-const downloadSaveBtn=document.getElementById("downloadSaveBtn");
+function openDb(){return new Promise((ok,no)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains(ROMS))d.createObjectStore(ROMS,{keyPath:"id"});if(!d.objectStoreNames.contains(SAVES))d.createObjectStore(SAVES,{keyPath:"key"})};r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
+async function all(s){const d=await openDb();return new Promise((ok,no)=>{const r=d.transaction(s,"readonly").objectStore(s).getAll();r.onsuccess=()=>ok(r.result||[]);r.onerror=()=>no(r.error)})}
+async function one(s,k){const d=await openDb();return new Promise((ok,no)=>{const r=d.transaction(s,"readonly").objectStore(s).get(k);r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}
+async function put(s,v){const d=await openDb();return new Promise((ok,no)=>{const t=d.transaction(s,"readwrite");t.objectStore(s).put(v);t.oncomplete=()=>ok();t.onerror=()=>no(t.error)})}
+async function del(s,k){const d=await openDb();return new Promise((ok,no)=>{const t=d.transaction(s,"readwrite");t.objectStore(s).delete(k);t.oncomplete=()=>ok();t.onerror=()=>no(t.error)})}
+async function sha256(blob){const a=await blob.arrayBuffer(),h=await crypto.subtle.digest("SHA-256",a);return[...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+function fmt(t){return t?new Intl.DateTimeFormat("de-DE",{dateStyle:"short",timeStyle:"short"}).format(new Date(t)):"noch nie"}
+function token(){return sessionStorage.getItem("ghToken")||""}
+async function gh(url,opt={}){const t=token();if(!t)throw Error("Bitte zuerst mit GitHub verbinden.");const h={Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28",...(opt.headers||{}),Authorization:"Bearer "+t};const r=await fetch(url,{...opt,headers:h});if(!r.ok)throw Error("GitHub "+r.status+": "+(await r.text()).slice(0,180));return r}
+function b64(bytes){let s="",c=0x8000;for(let i=0;i<bytes.length;i+=c)s+=String.fromCharCode(...bytes.subarray(i,i+c));return btoa(s)}
+function unb64(s){const x=atob(s),a=new Uint8Array(x.length);for(let i=0;i<x.length;i++)a[i]=x.charCodeAt(i);return a}
 
-let currentGame=null;
-let currentObjectUrl=null;
-
-function openDb(){
-  return new Promise((resolve,reject)=>{
-    const req=indexedDB.open(DB_NAME,1);
-    req.onupgradeneeded=()=>{
-      const db=req.result;
-      if(!db.objectStoreNames.contains(ROM_STORE)) db.createObjectStore(ROM_STORE,{keyPath:"id"});
-      if(!db.objectStoreNames.contains(SAVE_STORE)) db.createObjectStore(SAVE_STORE,{keyPath:"gameId"});
-    };
-    req.onsuccess=()=>resolve(req.result);
-    req.onerror=()=>reject(req.error);
-  });
+$("connect").onclick=async()=>{const t=tokenInput.value.trim();if(!t)return;sessionStorage.setItem("ghToken",t);try{const r=await gh("https://api.github.com/user");const u=await r.json();ghStatus.textContent="Verbunden als "+u.login+" · private Builds + Cloud-Saves aktiv";await refreshCloudLabels()}catch(e){sessionStorage.removeItem("ghToken");ghStatus.textContent=e.message}};
+$("disconnect").onclick=()=>{sessionStorage.removeItem("ghToken");tokenInput.value="";ghStatus.textContent="Nicht verbunden."};
+async function refreshCloudLabels(){for(const [id,p] of Object.entries(PROJECTS)){try{const r=await latestRun(p);$(id+"Status").textContent="Letzter erfolgreicher Build: "+r.head_sha.slice(0,7)+" · "+fmt(r.created_at)}catch(e){$(id+"Status").textContent=e.message}}}
+async function latestRun(p){const u="https://api.github.com/repos/"+p.repo+"/actions/runs?branch="+encodeURIComponent(p.branch)+"&status=success&per_page=30";const j=await (await gh(u)).json();const r=(j.workflow_runs||[]).find(x=>x.name===p.workflow);if(!r)throw Error("Kein erfolgreicher Build gefunden.");return r}
+async function loadProject(id){
+ const p=PROJECTS[id],st=$(id+"Status");try{
+  st.textContent="Suche neuesten Build…";const run=await latestRun(p);
+  st.textContent="Lade Artefakt "+run.head_sha.slice(0,7)+"…";
+  const aj=await (await gh("https://api.github.com/repos/"+p.repo+"/actions/runs/"+run.id+"/artifacts")).json();
+  const a=(aj.artifacts||[]).find(x=>x.name===p.artifact&&!x.expired);if(!a)throw Error("Passendes Build-Artefakt fehlt oder ist abgelaufen.");
+  const zr=await gh(a.archive_download_url,{headers:{Accept:"application/octet-stream"}});const zip=await JSZip.loadAsync(await zr.arrayBuffer());
+  const names=Object.keys(zip.files).filter(n=>/\.gba$/i.test(n)&&!zip.files[n].dir);if(!names.length)throw Error("Im Artefakt wurde keine .gba gefunden.");
+  const blob=new Blob([await zip.files[names[0]].async("arraybuffer")],{type:"application/octet-stream"}),hash=await sha256(blob);
+  const entry={id:p.key,saveKey:p.key,name:p.title+".gba",blob,source:"github",repo:p.repo,branch:p.branch,sha:run.head_sha,buildTime:run.created_at,contentHash:hash,lastPlayed:Date.now()};
+  await put(ROMS,entry);st.textContent="Bereit: "+run.head_sha.slice(0,7)+" · starte…";await render();await startGame(entry.id);
+ }catch(e){console.error(e);st.textContent="Fehler: "+e.message}
 }
+document.querySelectorAll(".projectBtn").forEach(b=>b.onclick=()=>loadProject(b.dataset.project));
 
-async function getAll(store){
-  const db=await openDb();
-  return new Promise((resolve,reject)=>{
-    const t=db.transaction(store,"readonly");
-    const req=t.objectStore(store).getAll();
-    req.onsuccess=()=>resolve(req.result||[]);
-    req.onerror=()=>reject(req.error);
-  });
-}
-async function getOne(store,key){
-  const db=await openDb();
-  return new Promise((resolve,reject)=>{
-    const t=db.transaction(store,"readonly");
-    const req=t.objectStore(store).get(key);
-    req.onsuccess=()=>resolve(req.result);
-    req.onerror=()=>reject(req.error);
-  });
-}
-async function putOne(store,value){
-  const db=await openDb();
-  return new Promise((resolve,reject)=>{
-    const t=db.transaction(store,"readwrite");
-    t.objectStore(store).put(value);
-    t.oncomplete=()=>resolve();
-    t.onerror=()=>reject(t.error);
-  });
-}
-async function delOne(store,key){
-  const db=await openDb();
-  return new Promise((resolve,reject)=>{
-    const t=db.transaction(store,"readwrite");
-    t.objectStore(store).delete(key);
-    t.oncomplete=()=>resolve();
-    t.onerror=()=>reject(t.error);
-  });
-}
+$("romInput").onchange=async e=>{for(const f of [...e.target.files]){if(!/\.gba$/i.test(f.name))continue;const id=await sha256(f),old=await one(ROMS,id);await put(ROMS,{id,saveKey:id,name:f.name,blob:f.slice(0,f.size,"application/octet-stream"),source:"local",addedAt:old?.addedAt||Date.now(),lastPlayed:old?.lastPlayed||0})}e.target.value="";render()};
+async function render(){const rs=(await all(ROMS)).sort((a,b)=>(b.lastPlayed||b.buildTime||b.addedAt)-(a.lastPlayed||a.buildTime||a.addedAt));library.innerHTML="";if(!rs.length){library.innerHTML='<div class="empty">Noch keine ROM in der lokalen Bibliothek.</div>';return}
+ for(const r of rs){const s=await one(SAVES,r.saveKey),d=document.createElement("div");d.className="game-card";const left=document.createElement("div"),act=document.createElement("div");act.className="actions";left.innerHTML='<div class="game-title"></div><div class="meta"></div>';left.firstChild.textContent=r.name.replace(/\.gba$/i,"");left.lastChild.textContent=(r.source==="github"?"GitHub "+(r.sha||"").slice(0,7):"lokal")+" · Save: "+(s?fmt(s.updatedAt):"noch keiner");
+ const p=document.createElement("button");p.className="primary";p.textContent="Spielen";p.onclick=()=>startGame(r.id);const x=document.createElement("button");x.className="danger";x.textContent="Entfernen";x.onclick=async()=>{if(confirm("ROM lokal entfernen?")){await del(ROMS,r.id);render()}};act.append(p,x);d.append(left,act);library.append(d)}}
 
-async function hashFile(file){
-  const buffer=await file.arrayBuffer();
-  const hash=await crypto.subtle.digest("SHA-256",buffer);
-  return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,"0")).join("");
-}
+async function cloudGet(key){if(!token())return null;try{const r=await gh("https://api.github.com/repos/"+SAVE_REPO+"/contents/cloud-saves/"+key+".json");const j=await r.json(),txt=decodeURIComponent(escape(atob(j.content.replace(/\n/g,"")))),data=JSON.parse(txt);return{...data,sha:j.sha}}catch(e){if(String(e).includes("404"))return null;throw e}}
+async function cloudPut(key,save){if(!token())return;const existing=await cloudGet(key),payload={key,updatedAt:save.updatedAt,buildSha:currentGame?.sha||null,save:b64(new Uint8Array(await save.bytes.arrayBuffer()))},body={message:"Sync GBA save: "+key,content:btoa(unescape(encodeURIComponent(JSON.stringify(payload))))};if(existing?.sha)body.sha=existing.sha;await gh("https://api.github.com/repos/"+SAVE_REPO+"/contents/cloud-saves/"+key+".json",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)})}
+async function syncFromCloud(force=false){if(!currentGame||!token())return false;const c=await cloudGet(currentGame.saveKey);if(!c)return false;const l=await one(SAVES,currentGame.saveKey);if(force||!l||c.updatedAt>l.updatedAt){await put(SAVES,{key:currentGame.saveKey,bytes:new Blob([unb64(c.save)]),updatedAt:c.updatedAt,cloud:true});await updateSaveUI();return true}return false}
+async function injectLocalSave(){const s=await one(SAVES,currentGame.saveKey);if(!s?.bytes||!window.EJS_emulator?.gameManager)return;const gm=window.EJS_emulator.gameManager,bytes=new Uint8Array(await s.bytes.arrayBuffer());try{gm.FS.writeFile(gm.getSaveFilePath(),bytes);gm.loadSaveFiles();saveStatus.innerHTML='<span class="dot ok"></span>Save geladen: '+fmt(s.updatedAt)}catch(e){console.warn("Save konnte nicht injiziert werden",e)}}
+async function updateSaveUI(){if(!currentGame)return;const s=await one(SAVES,currentGame.saveKey);$("downloadSaveBtn").disabled=!s;saveStatus.innerHTML=s?'<span class="dot ok"></span>Save: '+fmt(s.updatedAt)+(token()?" · Cloud aktiv":" · nur lokal"):'<span class="dot"></span>Noch kein Save erkannt'}
 
-function fmtDate(ts){
-  if(!ts) return "noch nie";
-  return new Intl.DateTimeFormat("de-DE",{dateStyle:"short",timeStyle:"short"}).format(new Date(ts));
-}
-
-async function renderLibrary(){
-  const roms=(await getAll(ROM_STORE)).sort((a,b)=>(b.lastPlayed||b.addedAt)-(a.lastPlayed||a.addedAt));
-  library.innerHTML="";
-  if(!roms.length){
-    library.innerHTML='<div class="empty">Noch keine GBA-ROM hinzugefügt.</div>';
-    return;
-  }
-
-  for(const rom of roms){
-    const save=await getOne(SAVE_STORE,rom.id);
-    const card=document.createElement("div");
-    card.className="game-card";
-
-    const info=document.createElement("div");
-    info.innerHTML='<div class="game-title"></div><div class="meta"></div>';
-    info.querySelector(".game-title").textContent=rom.name.replace(/\.gba$/i,"");
-    info.querySelector(".meta").textContent=((rom.blob.size/1024/1024).toFixed(2))+" MB · Save: "+(save?fmtDate(save.updatedAt):"noch keiner");
-
-    const buttons=document.createElement("div");
-    buttons.className="card-buttons";
-
-    const play=document.createElement("button");
-    play.className="primary";
-    play.textContent="Spielen";
-    play.onclick=()=>startGame(rom.id);
-
-    const remove=document.createElement("button");
-    remove.className="danger";
-    remove.textContent="Entfernen";
-    remove.onclick=async()=>{
-      if(!confirm('"'+rom.name+'" aus der lokalen Bibliothek entfernen?')) return;
-      await delOne(ROM_STORE,rom.id);
-      await renderLibrary();
-    };
-
-    buttons.append(play,remove);
-    card.append(info,buttons);
-    library.append(card);
-  }
-}
-
-romInput.addEventListener("change",async()=>{
-  const files=[...(romInput.files||[])];
-  for(const file of files){
-    if(!file.name.toLowerCase().endsWith(".gba")) continue;
-
-    const id=await hashFile(file);
-    const existing=await getOne(ROM_STORE,id);
-
-    await putOne(ROM_STORE,{
-      id,
-      name:file.name,
-      blob:file.slice(0,file.size,"application/octet-stream"),
-      addedAt:existing?.addedAt||Date.now(),
-      lastPlayed:existing?.lastPlayed||0
-    });
-  }
-  romInput.value="";
-  await renderLibrary();
-});
-
-function cleanEmulator(){
-  if(currentObjectUrl){
-    URL.revokeObjectURL(currentObjectUrl);
-    currentObjectUrl=null;
-  }
-  game.innerHTML="";
-  const loader=document.getElementById("ejs-loader");
-  if(loader) loader.remove();
-}
-
-async function updateSaveUI(){
-  if(!currentGame) return;
-  const save=await getOne(SAVE_STORE,currentGame.id);
-  if(save){
-    saveStatus.innerHTML='<span class="dot ok"></span>Lokale Sicherung: '+fmtDate(save.updatedAt);
-    downloadSaveBtn.disabled=false;
-  }else{
-    saveStatus.innerHTML='<span class="dot"></span>Noch kein Save erkannt';
-    downloadSaveBtn.disabled=true;
-  }
-}
-
-async function startGame(id){
-  const rom=await getOne(ROM_STORE,id);
-  if(!rom) return;
-
-  cleanEmulator();
-  currentGame=rom;
-  rom.lastPlayed=Date.now();
-  await putOne(ROM_STORE,rom);
-
-  currentObjectUrl=URL.createObjectURL(rom.blob);
-  gameTitle.textContent=rom.name.replace(/\.gba$/i,"");
-
-  const numericId=parseInt(rom.id.slice(0,8),16);
-
-  window.EJS_player="#game";
-  window.EJS_core="gba";
-  window.EJS_gameName=rom.id;
-  window.EJS_gameID=numericId;
-  window.EJS_gameUrl=currentObjectUrl;
-  window.EJS_pathtodata="https://cdn.emulatorjs.org/stable/data/";
-  window.EJS_startOnLoaded=true;
-  window.EJS_language="de-DE";
-  window.EJS_fixedSaveInterval=10000;
-
-  window.EJS_onSaveUpdate=async function(e){
-    try{
-      const bytes=e?.save instanceof Uint8Array ? e.save : new Uint8Array(e?.save||[]);
-      if(!bytes.length) return;
-      await putOne(SAVE_STORE,{
-        gameId:rom.id,
-        bytes:new Blob([bytes],{type:"application/octet-stream"}),
-        updatedAt:Date.now(),
-        hash:e?.hash||null
-      });
-      await updateSaveUI();
-    }catch(err){
-      console.error("Save backup failed",err);
-    }
-  };
-
-  libraryPanel.classList.add("hidden");
-  playerPanel.classList.remove("hidden");
-  await updateSaveUI();
-
-  const script=document.createElement("script");
-  script.id="ejs-loader";
-  script.src="https://cdn.emulatorjs.org/stable/data/loader.js";
-  script.async=true;
-  script.onerror=()=>alert("EmulatorJS konnte nicht geladen werden.");
-  document.body.appendChild(script);
-}
-
-backBtn.addEventListener("click",async()=>{
-  cleanEmulator();
-  currentGame=null;
-  playerPanel.classList.add("hidden");
-  libraryPanel.classList.remove("hidden");
-  await renderLibrary();
-});
-
-downloadSaveBtn.addEventListener("click",async()=>{
-  if(!currentGame) return;
-  const save=await getOne(SAVE_STORE,currentGame.id);
-  if(!save?.bytes) return;
-
-  const url=URL.createObjectURL(save.bytes);
-  const a=document.createElement("a");
-  a.href=url;
-  a.download=currentGame.name.replace(/\.gba$/i,"")+".sav";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),1000);
-});
-
-renderLibrary();
-</script>
-</body>
-</html>
+function cleanup(){if(romUrl)URL.revokeObjectURL(romUrl);romUrl=null;game.innerHTML="";document.getElementById("ejs-loader")?.remove()}
+async function startGame(id){const r=await one(ROMS,id);if(!r)return;cleanup();currentGame=r;r.lastPlayed=Date.now();await put(ROMS,r);if(token())try{await syncFromCloud(false)}catch(e){console.warn(e)}
+ romUrl=URL.createObjectURL(r.blob);gameTitle.textContent=r.name.replace(/\.gba$/i,"");libraryPanel.classList.add("hidden");playerPanel.classList.remove("hidden");await updateSaveUI();
+ window.EJS_player="#game";window.EJS_core="gba";window.EJS_gameName=r.saveKey;window.EJS_gameID=parseInt((r.contentHash||r.id).slice(0,8),16)||12345;window.EJS_gameUrl=romUrl;window.EJS_pathtodata="https://cdn.emulatorjs.org/latest/data/";window.EJS_startOnLoaded=true;window.EJS_language="de-DE";window.EJS_fixedSaveInterval=10000;
+ window.EJS_onGameStart=()=>setTimeout(injectLocalSave,900);
+ window.EJS_onSaveUpdate=async e=>{try{const bytes=e?.save instanceof Uint8Array?e.save:new Uint8Array(e?.save||[]);if(!bytes.length)return;const s={key:r.saveKey,bytes:new Blob([bytes]),updatedAt:Date.now(),hash:e?.hash||null};await put(SAVES,s);await updateSaveUI();clearTimeout(cloudTimer);if(token())cloudTimer=setTimeout(()=>cloudPut(r.saveKey,s).catch(console.error),1800)}catch(err){console.error(err)}};
+ const sc=document.createElement("script");sc.id="ejs-loader";sc.src="https://cdn.emulatorjs.org/latest/data/loader.js";sc.async=true;sc.onerror=()=>alert("EmulatorJS konnte nicht geladen werden.");document.body.appendChild(sc)}
+$("backBtn").onclick=async()=>{cleanup();currentGame=null;playerPanel.classList.add("hidden");libraryPanel.classList.remove("hidden");render()};
+$("cloudPullBtn").onclick=async()=>{if(!currentGame)return;try{const ok=await syncFromCloud(true);if(ok){await injectLocalSave();alert("Cloud-Save geladen.")}else alert("Kein Cloud-Save gefunden.")}catch(e){alert(e.message)}};
+$("cloudPushBtn").onclick=async()=>{if(!currentGame)return;try{const s=await one(SAVES,currentGame.saveKey);if(!s)throw Error("Noch kein Save vorhanden.");await cloudPut(currentGame.saveKey,s);alert("Save in GitHub gespeichert.")}catch(e){alert(e.message)}};
+$("downloadSaveBtn").onclick=async()=>{if(!currentGame)return;const s=await one(SAVES,currentGame.saveKey);if(!s)return;const u=URL.createObjectURL(s.bytes),a=document.createElement("a");a.href=u;a.download=currentGame.name.replace(/\.gba$/i,"")+".sav";a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
+render();if(token()){$("connect").click()}
+</script></body></html>
