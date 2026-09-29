@@ -12,7 +12,19 @@ button,.file,input{border-radius:10px;font:inherit}button,.file{border:1px solid
 input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid var(--line);color:var(--text);margin:8px 0}.muted,.meta,.note{color:var(--muted)}.muted{font-size:.84rem}.note{font-size:.76rem;line-height:1.45}
 .projects,.library{display:grid;gap:8px}.projects{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:10px}.card,.game-card{background:#111722;border:1px solid var(--line);border-radius:12px;padding:11px}.card strong,.game-title{font-weight:800}.card .meta{font-size:.76rem;margin:4px 0 10px}.actions{display:flex;gap:7px;flex-wrap:wrap}.actions>*{flex:0 0 auto}
 .game-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.game-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meta{font-size:.75rem;margin-top:3px}.hidden{display:none!important}
-#game{width:100%;aspect-ratio:4/3;background:#000;border-radius:12px;overflow:hidden;min-height:280px;touch-action:none;overscroll-behavior:contain;outline:none}#game canvas{max-width:100%!important;max-height:100%!important}
+#game{width:100%;aspect-ratio:3/2;background:#000;border-radius:12px;overflow:hidden;min-height:280px;touch-action:none;overscroll-behavior:contain;outline:none}#game canvas{max-width:100%!important;max-height:100%!important}
+.mobileControls{display:none;user-select:none;-webkit-user-select:none;touch-action:none;overscroll-behavior:contain;background:#111722;border:1px solid var(--line);border-radius:14px;padding:10px;margin:10px 0}
+.shoulderRow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}.shoulderRow .touchBtn{height:42px;border-radius:12px}
+.controlMain{display:grid;grid-template-columns:1fr .72fr 1fr;align-items:center;gap:8px;min-height:170px}
+.dpad{width:164px;height:164px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:3px;margin:auto}
+.touchBtn{touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;background:#273244;border:1px solid #45536a;color:#fff;font-weight:900;box-shadow:inset 0 -3px 0 rgba(0,0,0,.25)}
+.touchBtn.pressed{transform:translateY(2px);filter:brightness(1.3);box-shadow:inset 0 0 0 rgba(0,0,0,0)}
+.dpad .up{grid-column:2;grid-row:1}.dpad .left{grid-column:1;grid-row:2}.dpad .center{grid-column:2;grid-row:2;background:#202938;border:1px solid #364256;border-radius:5px}.dpad .right{grid-column:3;grid-row:2}.dpad .down{grid-column:2;grid-row:3}
+.dpad .touchBtn{padding:0;font-size:1.45rem;border-radius:8px}
+.centerControls{display:flex;flex-direction:column;align-items:center;gap:8px}.centerPair{display:flex;gap:7px}.miniTouch{padding:9px 10px;font-size:.72rem;border-radius:999px;min-width:64px}
+.abControls{position:relative;width:164px;height:150px;margin:auto}.roundBtn{position:absolute;width:72px;height:72px;border-radius:50%;font-size:1.65rem;padding:0}.roundBtn.b{left:2px;top:63px}.roundBtn.a{right:2px;top:24px}
+.speedRow{display:flex;justify-content:center;gap:8px;margin-top:8px}.speedRow .touchBtn{font-size:.72rem;padding:7px 12px;opacity:.82}
+.mobileControlHint{text-align:center;color:var(--muted);font-size:.68rem;margin-top:7px}
 .stateManager{margin:10px 0 12px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#111722}
 .stateSectionTitle{font-size:.72rem;font-weight:900;letter-spacing:.08em;color:var(--muted);margin:2px 0 7px}
 .stateButtons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -21,12 +33,13 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 .slotMeta{font-size:.72rem;color:var(--muted);margin-top:7px;min-height:1.1em}
 .savebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.save-status{flex:1;min-width:200px;font-size:.8rem;color:var(--muted)}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--warn)}.dot.ok{background:var(--ok)}
 .status{margin-top:8px;font-size:.8rem;color:var(--muted);min-height:1.2em}.empty{text-align:center;padding:15px;color:var(--muted);border:1px dashed var(--line);border-radius:10px}.rememberRow{display:flex;align-items:center;gap:8px;margin:2px 0 10px;color:var(--muted);font-size:.84rem}.rememberRow input{width:auto;margin:0}
-@media(max-width:680px){.projects{grid-template-columns:1fr}.game-card{grid-template-columns:1fr}.game-card .actions button{flex:1}.panel{padding:8px}body{padding:5px}.wrap{max-width:none}.player-head{align-items:flex-start}#game{min-height:0;width:100%;max-height:calc(100vh - 210px)}.stateButtons{grid-template-columns:repeat(3,1fr)}.stateButtons button{padding:9px 5px;font-size:.82rem}}
-@media(max-width:480px) and (orientation:portrait){body{padding:3px}.panel{border-radius:10px;padding:7px}.player-head{margin-bottom:6px}#playerPanel{margin:0}#game{aspect-ratio:4/3;max-height:none;border-radius:8px}.stateManager{padding:7px;margin:6px 0}.stateButtons{gap:5px}.stateButtons button{font-size:.76rem;padding:9px 3px}.slotMeta{font-size:.67rem}}
+@media(max-width:680px){.projects{grid-template-columns:1fr}.game-card{grid-template-columns:1fr}.game-card .actions button{flex:1}.panel{padding:8px}body{padding:5px}.wrap{max-width:none}.player-head{align-items:flex-start;margin-bottom:8px}#game{min-height:0;width:100%;max-height:none;aspect-ratio:3/2}#game .ejs_virtualGamepad_parent{display:none!important}.mobileControls{display:block}.stateButtons{grid-template-columns:repeat(3,1fr)}.stateButtons button{padding:9px 5px;font-size:.82rem}}
+@media(max-width:480px) and (orientation:portrait){body{padding:3px}.panel{border-radius:10px;padding:6px}.player-head{margin-bottom:6px}#playerPanel{margin:0}#game{aspect-ratio:3/2;max-height:none;border-radius:8px}.mobileControls{padding:8px;margin:7px 0}.shoulderRow{gap:8px}.controlMain{grid-template-columns:1fr .66fr 1fr;gap:2px;min-height:154px}.dpad{width:148px;height:148px}.abControls{width:148px;height:142px}.roundBtn{width:66px;height:66px}.roundBtn.b{top:60px}.roundBtn.a{top:22px}.miniTouch{min-width:56px;padding:8px 7px;font-size:.68rem}.stateManager{padding:7px;margin:7px 0}.stateButtons{gap:5px}.stateButtons button{font-size:.76rem;padding:9px 3px}.slotMeta{font-size:.67rem}}
+@media(max-width:390px) and (orientation:portrait){.controlMain{grid-template-columns:1fr .58fr 1fr}.dpad{width:132px;height:132px}.abControls{width:132px;height:132px}.roundBtn{width:60px;height:60px}.roundBtn.b{top:57px}.roundBtn.a{top:18px}.centerPair{flex-direction:column;gap:5px}.miniTouch{min-width:54px;padding:6px 5px}}
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.10 · Drive-Dateien</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.11 · Portrait-Controls</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -50,6 +63,40 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 
 <section id="playerPanel" class="panel hidden">
 <div class="player-head"><div><div class="muted">AKTIVES SPIEL</div><strong id="gameTitle">Game Boy Advance</strong></div><button id="backBtn">← Bibliothek</button></div>
+
+<div id="game" tabindex="0"></div>
+
+<div id="mobileControls" class="mobileControls" aria-label="Mobile GBA Steuerung">
+ <div class="shoulderRow">
+  <button class="touchBtn" data-input="10">L</button>
+  <button class="touchBtn" data-input="11">R</button>
+ </div>
+ <div class="controlMain">
+  <div class="dpad">
+   <button class="touchBtn up" data-input="4" aria-label="Hoch">▲</button>
+   <button class="touchBtn left" data-input="6" aria-label="Links">◀</button>
+   <div class="center"></div>
+   <button class="touchBtn right" data-input="7" aria-label="Rechts">▶</button>
+   <button class="touchBtn down" data-input="5" aria-label="Runter">▼</button>
+  </div>
+  <div class="centerControls">
+   <div class="centerPair">
+    <button class="touchBtn miniTouch" data-input="2">Select</button>
+    <button class="touchBtn miniTouch" data-input="3">Start</button>
+   </div>
+  </div>
+  <div class="abControls">
+   <button class="touchBtn roundBtn b" data-input="0">B</button>
+   <button class="touchBtn roundBtn a" data-input="8">A</button>
+  </div>
+ </div>
+ <div class="speedRow">
+  <button class="touchBtn" data-input="27">Fast</button>
+  <button class="touchBtn" data-input="29">Slow</button>
+ </div>
+ <div class="mobileControlHint">Touch-Steuerung · Spielbild bleibt frei</div>
+</div>
+
 <div class="stateManager">
 <div id="stateStatus" class="save-status"><span class="dot"></span>Noch kein Save State</div>
 <div class="stateDivider"></div>
@@ -68,7 +115,6 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 <button class="stateSaveSlot" data-slot="3">In Slot 3 speichern</button>
 </div>
 </div>
-<div id="game" tabindex="0"></div>
 </section>
 
 <section class="panel"><h2>Speicherstände</h2><div class="note"><b>Save States sind die primäre Speicherart.</b> Es gibt drei getrennte Slots. Jeder Slot wird lokal und bei GitHub-Verbindung zusätzlich im privaten <code>cloud-saves</code>-Branch des jeweiligen Spiele-Repositories gespeichert. Laden und Speichern sind bewusst getrennt; beim Überschreiben eines belegten Slots wird nachgefragt. Normale Pokémon-Ingame-Saves laufen nur noch automatisch im Hintergrund.</div></section>
@@ -209,7 +255,7 @@ async function syncFromCloud(force=false){
  }
  return false;
 }
-async function injectLocalSave(){const s=await one(SAVES,currentGame.saveKey);if(!s?.bytes||!window.EJS_emulator?.gameManager)return;const gm=window.EJS_emulator.gameManager,bytes=new Uint8Array(await s.bytes.arrayBuffer());try{gm.FS.writeFile(gm.getSaveFilePath(),bytes);gm.loadSaveFiles();saveStatus.innerHTML='<span class="dot ok"></span>Save geladen: '+fmt(s.updatedAt)}catch(e){console.warn("Save konnte nicht injiziert werden",e)}}
+async function injectLocalSave(){const s=await one(SAVES,currentGame.saveKey);if(!s?.bytes||!window.EJS_emulator?.gameManager)return;const gm=window.EJS_emulator.gameManager,bytes=new Uint8Array(await s.bytes.arrayBuffer());try{gm.FS.writeFile(gm.getSaveFilePath(),bytes);gm.loadSaveFiles();if(saveStatus)saveStatus.innerHTML='<span class="dot ok"></span>Save geladen: '+fmt(s.updatedAt)}catch(e){console.warn("Save konnte nicht injiziert werden",e)}}
 function stateKey(slot){return currentGame.saveKey+":slot"+slot}
 function statePath(slot){return "emulator-saves/save-state-slot-"+slot+".json"}
 
@@ -327,6 +373,32 @@ async function startGame(id){const r=await one(ROMS,id);if(!r)return;cleanup();c
 document.querySelectorAll(".stateSaveSlot").forEach(b=>b.onclick=async()=>{try{await saveStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
 document.querySelectorAll(".stateLoadSlot").forEach(b=>b.onclick=async()=>{try{await loadStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
 $("backBtn").onclick=async()=>{cleanup();currentGame=null;playerPanel.classList.add("hidden");libraryPanel.classList.remove("hidden");render()};
+
+// Custom mobile controls. EmulatorJS uses Libretro GBA input indices:
+// B=0, Select=2, Start=3, Up=4, Down=5, Left=6, Right=7, A=8, L=10, R=11.
+function sendTouchInput(index,value){
+ const gm=window.EJS_emulator?.gameManager;
+ if(!gm)return;
+ try{gm.simulateInput(0,index,value)}catch(e){console.warn("Touch input failed",index,e)}
+}
+document.querySelectorAll("#mobileControls .touchBtn[data-input]").forEach(btn=>{
+ const index=Number(btn.dataset.input);
+ const release=()=>{
+  if(!btn.classList.contains("pressed"))return;
+  btn.classList.remove("pressed");
+  sendTouchInput(index,0);
+ };
+ btn.addEventListener("pointerdown",e=>{
+  e.preventDefault();
+  btn.classList.add("pressed");
+  try{btn.setPointerCapture(e.pointerId)}catch(_){}
+  sendTouchInput(index,1);
+ });
+ btn.addEventListener("pointerup",e=>{e.preventDefault();release()});
+ btn.addEventListener("pointercancel",release);
+ btn.addEventListener("lostpointercapture",release);
+ btn.addEventListener("contextmenu",e=>e.preventDefault());
+});
 
 // Prevent browser page scrolling while the emulator is active.
 window.addEventListener("keydown",e=>{
