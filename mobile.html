@@ -21,9 +21,10 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 .touchBtn.pressed{transform:translateY(2px);filter:brightness(1.3);box-shadow:inset 0 0 0 rgba(0,0,0,0)}
 .dpad .up{grid-column:2;grid-row:1}.dpad .left{grid-column:1;grid-row:2}.dpad .center{grid-column:2;grid-row:2;background:#202938;border:1px solid #364256;border-radius:5px}.dpad .right{grid-column:3;grid-row:2}.dpad .down{grid-column:2;grid-row:3}
 .dpad .touchBtn{padding:0;font-size:1.45rem;border-radius:8px}
-.centerControls{display:flex;flex-direction:column;align-items:center;gap:8px}.centerPair{display:flex;gap:7px}.miniTouch{padding:9px 10px;font-size:.72rem;border-radius:999px;min-width:64px}
-.abControls{position:relative;width:164px;height:150px;margin:auto}.roundBtn{position:absolute;width:72px;height:72px;border-radius:50%;font-size:1.65rem;padding:0}.roundBtn.b{left:2px;top:63px}.roundBtn.a{right:2px;top:24px}
-.speedRow{display:flex;justify-content:center;gap:8px;margin-top:8px}.speedRow .touchBtn{font-size:.72rem;padding:7px 12px;opacity:.82}
+.centerControls{display:flex;flex-direction:column;align-items:center;gap:8px}.centerPair{display:flex;gap:7px}.miniTouch{padding:9px 12px;font-size:.72rem;border-radius:999px;min-width:70px}
+.abControls{position:relative;width:142px;height:146px;margin:auto;justify-self:center;transform:translateX(-12px)}.roundBtn{position:absolute;width:66px;height:66px;border-radius:50%;font-size:1.55rem;padding:0}.roundBtn.b{left:0;top:62px}.roundBtn.a{right:0;top:22px}
+.speedTop{display:flex;justify-content:center;align-items:center;gap:10px;height:72px;margin:-2px 0 0}.speedBtn{width:42px;height:66px;padding:5px 3px!important;font-size:.68rem!important;writing-mode:vertical-rl;transform:rotate(180deg);opacity:.9}.speedBtn.active{background:#31506b;border-color:#5b8db5}.speedValue{min-width:54px;text-align:center;font-size:.8rem;font-weight:900;color:var(--accent)}
+.bottomSystem{display:flex;justify-content:center;gap:10px;margin-top:7px}.bottomSystem .touchBtn{min-width:92px;font-size:.76rem;padding:9px 13px}
 .mobileControlHint{text-align:center;color:var(--muted);font-size:.68rem;margin-top:7px}
 .stateManager{margin:10px 0 12px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#111722}
 .stateSectionTitle{font-size:.72rem;font-weight:900;letter-spacing:.08em;color:var(--muted);margin:2px 0 7px}
@@ -34,12 +35,12 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 .savebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.save-status{flex:1;min-width:200px;font-size:.8rem;color:var(--muted)}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--warn)}.dot.ok{background:var(--ok)}
 .status{margin-top:8px;font-size:.8rem;color:var(--muted);min-height:1.2em}.empty{text-align:center;padding:15px;color:var(--muted);border:1px dashed var(--line);border-radius:10px}.rememberRow{display:flex;align-items:center;gap:8px;margin:2px 0 10px;color:var(--muted);font-size:.84rem}.rememberRow input{width:auto;margin:0}
 @media(max-width:680px){.projects{grid-template-columns:1fr}.game-card{grid-template-columns:1fr}.game-card .actions button{flex:1}.panel{padding:8px}body{padding:5px}.wrap{max-width:none}.player-head{align-items:flex-start;margin-bottom:8px}#game{min-height:0;width:100%;max-height:none;aspect-ratio:3/2}#game .ejs_virtualGamepad_parent{display:none!important}.mobileControls{display:block}.stateButtons{grid-template-columns:repeat(3,1fr)}.stateButtons button{padding:9px 5px;font-size:.82rem}}
-@media(max-width:480px) and (orientation:portrait){body{padding:3px}.panel{border-radius:10px;padding:6px}.player-head{margin-bottom:6px}#playerPanel{margin:0}#game{aspect-ratio:3/2;max-height:none;border-radius:8px}.mobileControls{padding:8px;margin:7px 0}.shoulderRow{gap:8px}.controlMain{grid-template-columns:1fr .66fr 1fr;gap:2px;min-height:154px}.dpad{width:148px;height:148px}.abControls{width:148px;height:142px}.roundBtn{width:66px;height:66px}.roundBtn.b{top:60px}.roundBtn.a{top:22px}.miniTouch{min-width:56px;padding:8px 7px;font-size:.68rem}.stateManager{padding:7px;margin:7px 0}.stateButtons{gap:5px}.stateButtons button{font-size:.76rem;padding:9px 3px}.slotMeta{font-size:.67rem}}
-@media(max-width:390px) and (orientation:portrait){.controlMain{grid-template-columns:1fr .58fr 1fr}.dpad{width:132px;height:132px}.abControls{width:132px;height:132px}.roundBtn{width:60px;height:60px}.roundBtn.b{top:57px}.roundBtn.a{top:18px}.centerPair{flex-direction:column;gap:5px}.miniTouch{min-width:54px;padding:6px 5px}}
+@media(max-width:480px) and (orientation:portrait){body{padding:3px}.panel{border-radius:10px;padding:6px}.player-head{margin-bottom:6px}#playerPanel{margin:0}#game{aspect-ratio:3/2;max-height:none;border-radius:8px}.mobileControls{padding:8px;margin:7px 0}.shoulderRow{gap:8px}.controlMain{grid-template-columns:1fr .66fr 1fr;gap:2px;min-height:154px}.dpad{width:148px;height:148px}.abControls{width:132px;height:138px;transform:translateX(-10px)}.roundBtn{width:62px;height:62px}.roundBtn.b{top:59px}.roundBtn.a{top:20px}.miniTouch{min-width:72px;padding:8px 9px;font-size:.68rem}.speedTop{height:64px}.speedBtn{width:38px;height:58px}.bottomSystem .touchBtn{min-width:86px}.stateManager{padding:7px;margin:7px 0}.stateButtons{gap:5px}.stateButtons button{font-size:.76rem;padding:9px 3px}.slotMeta{font-size:.67rem}}
+@media(max-width:390px) and (orientation:portrait){.controlMain{grid-template-columns:1fr .58fr 1fr}.dpad{width:132px;height:132px}.abControls{width:120px;height:128px;transform:translateX(-8px)}.roundBtn{width:56px;height:56px}.roundBtn.b{top:54px}.roundBtn.a{top:17px}.miniTouch{min-width:68px;padding:7px 7px}.bottomSystem .touchBtn{min-width:80px}}
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.11 · Portrait-Controls</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.12 · Speed-Steuerung</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -71,6 +72,11 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
   <button class="touchBtn" data-input="10">L</button>
   <button class="touchBtn" data-input="11">R</button>
  </div>
+ <div class="speedTop">
+  <button id="speedSlow" class="touchBtn speedBtn" data-speed="-1">Slow</button>
+  <div id="speedValue" class="speedValue">1,0×</div>
+  <button id="speedFast" class="touchBtn speedBtn" data-speed="1">Fast</button>
+ </div>
  <div class="controlMain">
   <div class="dpad">
    <button class="touchBtn up" data-input="4" aria-label="Hoch">▲</button>
@@ -79,22 +85,17 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
    <button class="touchBtn right" data-input="7" aria-label="Rechts">▶</button>
    <button class="touchBtn down" data-input="5" aria-label="Runter">▼</button>
   </div>
-  <div class="centerControls">
-   <div class="centerPair">
-    <button class="touchBtn miniTouch" data-input="2">Select</button>
-    <button class="touchBtn miniTouch" data-input="3">Start</button>
-   </div>
-  </div>
+  <div class="centerControls"></div>
   <div class="abControls">
    <button class="touchBtn roundBtn b" data-input="0">B</button>
    <button class="touchBtn roundBtn a" data-input="8">A</button>
   </div>
  </div>
- <div class="speedRow">
-  <button class="touchBtn" data-input="27">Fast</button>
-  <button class="touchBtn" data-input="29">Slow</button>
+ <div class="bottomSystem">
+  <button class="touchBtn miniTouch" data-input="2">Select</button>
+  <button class="touchBtn miniTouch" data-input="3">Start</button>
  </div>
- <div class="mobileControlHint">Touch-Steuerung · Spielbild bleibt frei</div>
+ <div class="mobileControlHint">Touch-Steuerung · Geschwindigkeit per Tippen einstellen</div>
 </div>
 
 <div class="stateManager">
@@ -367,12 +368,57 @@ function cleanup(){if(romUrl)URL.revokeObjectURL(romUrl);romUrl=null;game.innerH
 async function startGame(id){const r=await one(ROMS,id);if(!r)return;cleanup();currentGame=r;r.lastPlayed=Date.now();await put(ROMS,r);if(token())try{await syncFromCloud(false)}catch(e){console.warn(e)}
  romUrl=URL.createObjectURL(r.blob);gameTitle.textContent=r.name.replace(/\.gba$/i,"");libraryPanel.classList.add("hidden");playerPanel.classList.remove("hidden");await updateSaveUI();await updateStateUI();
  window.EJS_player="#game";window.EJS_core="gba";window.EJS_gameName=r.saveKey;window.EJS_gameID=parseInt((r.contentHash||r.id).slice(0,8),16)||12345;window.EJS_gameUrl=romUrl;window.EJS_pathtodata="https://cdn.emulatorjs.org/4.2.3/data/";window.EJS_startOnLoaded=true;window.EJS_language="de-DE";window.EJS_fixedSaveInterval=10000;
- window.EJS_onGameStart=()=>setTimeout(()=>{injectLocalSave();game.focus({preventScroll:true})},900);
+ window.EJS_onGameStart=()=>setTimeout(()=>{speedIndex=3;applyEmulatorSpeed();injectLocalSave();game.focus({preventScroll:true})},900);
  window.EJS_onSaveUpdate=async e=>{try{const bytes=e?.save instanceof Uint8Array?e.save:new Uint8Array(e?.save||[]);if(!bytes.length)return;const s={key:r.saveKey,bytes:new Blob([bytes]),updatedAt:Date.now(),hash:e?.hash||null};await put(SAVES,s);await updateSaveUI();clearTimeout(cloudTimer);if(token())cloudTimer=setTimeout(()=>cloudPut(r.saveKey,s).catch(console.error),1800)}catch(err){console.error(err)}};
  const sc=document.createElement("script");sc.id="ejs-loader";sc.src="https://cdn.emulatorjs.org/4.2.3/data/loader.js";sc.async=true;sc.onerror=()=>alert("EmulatorJS konnte nicht geladen werden.");document.body.appendChild(sc)}
 document.querySelectorAll(".stateSaveSlot").forEach(b=>b.onclick=async()=>{try{await saveStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
 document.querySelectorAll(".stateLoadSlot").forEach(b=>b.onclick=async()=>{try{await loadStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
 $("backBtn").onclick=async()=>{cleanup();currentGame=null;playerPanel.classList.add("hidden");libraryPanel.classList.remove("hidden");render()};
+
+const SPEED_STEPS=[0.5,0.67,0.8,1,1.25,1.5,2,3,4];
+let speedIndex=3;
+
+function speedText(v){
+ return String(v).replace(".",",")+"×";
+}
+function updateSpeedUI(){
+ const v=SPEED_STEPS[speedIndex];
+ const label=$("speedValue");
+ if(label)label.textContent=speedText(v);
+ $("speedSlow")?.classList.toggle("active",v<1);
+ $("speedFast")?.classList.toggle("active",v>1);
+}
+function applyEmulatorSpeed(){
+ const gm=window.EJS_emulator?.gameManager;
+ if(!gm)return false;
+ const v=SPEED_STEPS[speedIndex];
+ try{
+  gm.functions.toggleFastForward(0);
+  gm.functions.toggleSlowMotion(0);
+  if(v>1){
+   gm.functions.setFastForwardRatio(v);
+   gm.functions.toggleFastForward(1);
+  }else if(v<1){
+   gm.functions.setSlowMotionRatio(1/v);
+   gm.functions.toggleSlowMotion(1);
+  }
+  updateSpeedUI();
+  return true;
+ }catch(e){
+  console.warn("Geschwindigkeit konnte nicht gesetzt werden",e);
+  return false;
+ }
+}
+document.querySelectorAll("#mobileControls [data-speed]").forEach(btn=>{
+ btn.addEventListener("click",e=>{
+  e.preventDefault();
+  const dir=Number(btn.dataset.speed)||0;
+  speedIndex=Math.max(0,Math.min(SPEED_STEPS.length-1,speedIndex+dir));
+  applyEmulatorSpeed();
+ });
+ btn.addEventListener("contextmenu",e=>e.preventDefault());
+});
+updateSpeedUI();
 
 // Custom mobile controls. EmulatorJS uses Libretro GBA input indices:
 // B=0, Select=2, Start=3, Up=4, Down=5, Left=6, Right=7, A=8, L=10, R=11.
