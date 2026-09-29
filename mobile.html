@@ -12,14 +12,21 @@ button,.file,input{border-radius:10px;font:inherit}button,.file{border:1px solid
 input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid var(--line);color:var(--text);margin:8px 0}.muted,.meta,.note{color:var(--muted)}.muted{font-size:.84rem}.note{font-size:.76rem;line-height:1.45}
 .projects,.library{display:grid;gap:8px}.projects{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:10px}.card,.game-card{background:#111722;border:1px solid var(--line);border-radius:12px;padding:11px}.card strong,.game-title{font-weight:800}.card .meta{font-size:.76rem;margin:4px 0 10px}.actions{display:flex;gap:7px;flex-wrap:wrap}.actions>*{flex:0 0 auto}
 .game-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.game-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meta{font-size:.75rem;margin-top:3px}.hidden{display:none!important}
-#game{width:100%;aspect-ratio:4/3;background:#000;border-radius:12px;overflow:hidden;min-height:280px}#game canvas{max-width:100%!important;max-height:100%!important}
+#game{width:100%;aspect-ratio:4/3;background:#000;border-radius:12px;overflow:hidden;min-height:280px;touch-action:none;overscroll-behavior:contain;outline:none}#game canvas{max-width:100%!important;max-height:100%!important}
+.stateManager{margin:10px 0 12px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#111722}
+.stateSectionTitle{font-size:.72rem;font-weight:900;letter-spacing:.08em;color:var(--muted);margin:2px 0 7px}
+.stateButtons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.stateButtons button{width:100%}.stateButtons.load button{background:#1d4f72;border-color:#286b97}.stateButtons.save{margin-top:6px}.stateButtons.save button{background:#2a2024;border-color:#5a343d;color:#ffd9df}
+.stateDivider{height:1px;background:var(--line);margin:12px 0}
+.slotMeta{font-size:.72rem;color:var(--muted);margin-top:7px;min-height:1.1em}
 .savebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}.save-status{flex:1;min-width:200px;font-size:.8rem;color:var(--muted)}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--warn)}.dot.ok{background:var(--ok)}
 .status{margin-top:8px;font-size:.8rem;color:var(--muted);min-height:1.2em}.empty{text-align:center;padding:15px;color:var(--muted);border:1px dashed var(--line);border-radius:10px}.rememberRow{display:flex;align-items:center;gap:8px;margin:2px 0 10px;color:var(--muted);font-size:.84rem}.rememberRow input{width:auto;margin:0}
-@media(max-width:680px){.projects{grid-template-columns:1fr}.game-card{grid-template-columns:1fr}.game-card .actions button{flex:1}.panel{padding:10px}body{padding:8px}#game{min-height:250px}}
+@media(max-width:680px){.projects{grid-template-columns:1fr}.game-card{grid-template-columns:1fr}.game-card .actions button{flex:1}.panel{padding:8px}body{padding:5px}.wrap{max-width:none}.player-head{align-items:flex-start}#game{min-height:0;width:100%;max-height:calc(100vh - 210px)}.stateButtons{grid-template-columns:repeat(3,1fr)}.stateButtons button{padding:9px 5px;font-size:.82rem}}
+@media(max-width:480px) and (orientation:portrait){body{padding:3px}.panel{border-radius:10px;padding:7px}.player-head{margin-bottom:6px}#playerPanel{margin:0}#game{aspect-ratio:4/3;max-height:none;border-radius:8px}.stateManager{padding:7px;margin:6px 0}.stateButtons{gap:5px}.stateButtons button{font-size:.76rem;padding:9px 3px}.slotMeta{font-size:.67rem}}
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.7 · Gerätetoken</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.8 · 3 State-Slots</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -43,21 +50,28 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 
 <section id="playerPanel" class="panel hidden">
 <div class="player-head"><div><div class="muted">AKTIVES SPIEL</div><strong id="gameTitle">Game Boy Advance</strong></div><button id="backBtn">← Bibliothek</button></div>
-<div class="savebar" style="margin-top:0;margin-bottom:10px">
+<div class="stateManager">
 <div id="stateStatus" class="save-status"><span class="dot"></span>Noch kein Save State</div>
-<button id="stateSaveBtn" class="primary">Save State + Cloud</button>
-<button id="stateLoadBtn" disabled>State laden (neuester)</button>
+<div class="stateDivider"></div>
+<div class="stateSectionTitle">LADEN</div>
+<div class="stateButtons load">
+<button class="stateLoadSlot" data-slot="1">Slot 1 laden</button>
+<button class="stateLoadSlot" data-slot="2">Slot 2 laden</button>
+<button class="stateLoadSlot" data-slot="3">Slot 3 laden</button>
 </div>
-<div id="game"></div>
-<div class="savebar">
-<div id="saveStatus" class="save-status"><span class="dot"></span>Noch kein Ingame-Save erkannt</div>
-<button id="cloudPullBtn">Cloud-Save laden</button>
-<button id="cloudPushBtn">Cloud-Save speichern</button>
-<button id="downloadSaveBtn" disabled>.sav herunterladen</button>
+<div id="slotMeta" class="slotMeta">Slot 1: leer · Slot 2: leer · Slot 3: leer</div>
+<div class="stateDivider"></div>
+<div class="stateSectionTitle">SPEICHERN – ÜBERSCHREIBT NUR DEN GEWÄHLTEN SLOT</div>
+<div class="stateButtons save">
+<button class="stateSaveSlot" data-slot="1">In Slot 1 speichern</button>
+<button class="stateSaveSlot" data-slot="2">In Slot 2 speichern</button>
+<button class="stateSaveSlot" data-slot="3">In Slot 3 speichern</button>
 </div>
+</div>
+<div id="game" tabindex="0"></div>
 </section>
 
-<section class="panel"><h2>Speicherstände</h2><div class="note"><b>Save States sind die primäre Speicherart.</b> Bei GitHub-Verbindung werden sie lokal und zusätzlich im privaten <code>cloud-saves</code>-Branch des jeweiligen Spiele-Repositories gespeichert. Auf einem zweiten Gerät lädt „State laden (neuester)“ automatisch den aktuellsten lokalen oder Cloud-State. Normale Pokémon-Ingame-Saves bleiben zusätzlich als Backup erhalten. Save States können zwischen unterschiedlichen ROM-Builds inkompatibel sein.</div></section>
+<section class="panel"><h2>Speicherstände</h2><div class="note"><b>Save States sind die primäre Speicherart.</b> Es gibt drei getrennte Slots. Jeder Slot wird lokal und bei GitHub-Verbindung zusätzlich im privaten <code>cloud-saves</code>-Branch des jeweiligen Spiele-Repositories gespeichert. Laden und Speichern sind bewusst getrennt; beim Überschreiben eines belegten Slots wird nachgefragt. Normale Pokémon-Ingame-Saves laufen nur noch automatisch im Hintergrund.</div></section>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
@@ -195,96 +209,130 @@ async function syncFromCloud(force=false){
  return false;
 }
 async function injectLocalSave(){const s=await one(SAVES,currentGame.saveKey);if(!s?.bytes||!window.EJS_emulator?.gameManager)return;const gm=window.EJS_emulator.gameManager,bytes=new Uint8Array(await s.bytes.arrayBuffer());try{gm.FS.writeFile(gm.getSaveFilePath(),bytes);gm.loadSaveFiles();saveStatus.innerHTML='<span class="dot ok"></span>Save geladen: '+fmt(s.updatedAt)}catch(e){console.warn("Save konnte nicht injiziert werden",e)}}
-async function updateStateUI(){
- if(!currentGame)return;
- const st=await one(STATES,currentGame.saveKey);
- const btn=$("stateLoadBtn");
- if(!st){
-   $("stateStatus").innerHTML='<span class="dot"></span>Noch kein Save State';
-   btn.disabled=false;
-   return;
+function stateKey(slot){return currentGame.saveKey+":slot"+slot}
+function statePath(slot){return "emulator-saves/save-state-slot-"+slot+".json"}
+
+async function getLocalSlot(slot){
+ let st=await one(STATES,stateKey(slot));
+ // Migration: previous single local state becomes Slot 1.
+ if(!st&&slot===1){
+   const legacy=await one(STATES,currentGame.saveKey);
+   if(legacy){
+     st={...legacy,key:stateKey(1)};
+     await put(STATES,st);
+   }
  }
- const sameBuild=!currentGame.sha||!st.buildSha||st.buildSha===currentGame.sha;
- $("stateStatus").innerHTML='<span class="dot ok"></span>State: '+fmt(st.updatedAt)+(sameBuild?'':' · anderer Build');
- btn.disabled=false;
+ return st;
 }
 
-async function saveStateNow(){
+async function getCloudSlot(slot){
+ if(!token()||!projectForGame(currentGame))return null;
+ let r=await cloudJsonGet(currentGame,statePath(slot));
+ // Migration: previous single cloud state becomes Slot 1.
+ if(!r&&slot===1)r=await cloudJsonGet(currentGame,"emulator-saves/save-state.json");
+ if(!r?.data?.state)return null;
+ return {
+   key:stateKey(slot),
+   bytes:new Blob([unb64(r.data.state)],{type:"application/octet-stream"}),
+   updatedAt:r.data.updatedAt||0,
+   buildSha:r.data.buildSha||null,
+   contentHash:r.data.contentHash||null,
+   cloud:true
+ };
+}
+
+async function newestSlot(slot){
+ const local=await getLocalSlot(slot);
+ let cloud=null;
+ try{cloud=await getCloudSlot(slot)}catch(e){console.warn("Cloud-State konnte nicht gelesen werden",e)}
+ if(cloud&&(!local||cloud.updatedAt>local.updatedAt)){
+   await put(STATES,cloud);
+   return cloud;
+ }
+ return local;
+}
+
+async function updateStateUI(){
+ if(!currentGame)return;
+ const parts=[];
+ let any=false;
+ for(let slot=1;slot<=3;slot++){
+   const st=await getLocalSlot(slot);
+   if(st){any=true;parts.push("Slot "+slot+": "+fmt(st.updatedAt))}
+   else parts.push("Slot "+slot+": leer");
+ }
+ $("slotMeta").textContent=parts.join(" · ");
+ $("stateStatus").innerHTML=any?'<span class="dot ok"></span>Save-State-Slots bereit':'<span class="dot"></span>Noch kein Save State';
+}
+
+async function saveStateNow(slot){
  if(!currentGame)return;
  const gm=window.EJS_emulator?.gameManager;
  if(!gm)throw Error("Emulator ist noch nicht bereit.");
+ const existing=await newestSlot(slot);
+ if(existing&&!confirm("Slot "+slot+" enthält bereits einen Stand vom "+fmt(existing.updatedAt)+". Wirklich überschreiben?"))return;
  let data;
  try{data=gm.getState();}catch(e){throw Error("Save State konnte nicht erzeugt werden: "+e.message);}
  if(!data||!data.length)throw Error("Der Emulator hat keinen Save State zurückgegeben.");
  const bytes=data instanceof Uint8Array?data:new Uint8Array(data);
- const record={key:currentGame.saveKey,bytes:new Blob([bytes],{type:"application/octet-stream"}),updatedAt:Date.now(),buildSha:currentGame.sha||null,contentHash:currentGame.contentHash||null};
+ const record={key:stateKey(slot),bytes:new Blob([bytes],{type:"application/octet-stream"}),updatedAt:Date.now(),buildSha:currentGame.sha||null,contentHash:currentGame.contentHash||null};
  await put(STATES,record);
- $("stateStatus").innerHTML='<span class="dot ok"></span>State lokal gespeichert · Cloud wird synchronisiert…';
+ $("stateStatus").innerHTML='<span class="dot ok"></span>Slot '+slot+' lokal gespeichert · Cloud wird synchronisiert…';
  if(token()&&projectForGame(currentGame)){
    try{
-     await cloudJsonPut(currentGame,"emulator-saves/save-state.json",{
+     await cloudJsonPut(currentGame,statePath(slot),{
        key:currentGame.saveKey,
+       slot,
        updatedAt:record.updatedAt,
        buildSha:record.buildSha,
        contentHash:record.contentHash,
        state:b64(bytes)
-     },"Sync emulator save state");
-     $("stateStatus").innerHTML='<span class="dot ok"></span>State lokal + Cloud: '+fmt(record.updatedAt);
+     },"Sync emulator save state slot "+slot);
+     $("stateStatus").innerHTML='<span class="dot ok"></span>Slot '+slot+' lokal + Cloud gespeichert: '+fmt(record.updatedAt);
    }catch(e){
-     $("stateStatus").innerHTML='<span class="dot ok"></span>State lokal gespeichert · Cloud-Fehler';
+     $("stateStatus").innerHTML='<span class="dot ok"></span>Slot '+slot+' lokal gespeichert · Cloud-Fehler';
+     await updateStateUI();
      throw Error("Lokal gespeichert, aber Cloud-Sync fehlgeschlagen: "+e.message);
    }
- }else{
-   await updateStateUI();
  }
+ await updateStateUI();
 }
-async function loadStateNow(){
+
+async function loadStateNow(slot){
  if(!currentGame)return;
  const gm=window.EJS_emulator?.gameManager;
  if(!gm)throw Error("Emulator ist noch nicht bereit.");
- let local=await one(STATES,currentGame.saveKey);
- let cloud=null;
- if(token()&&projectForGame(currentGame)){
-   const r=await cloudJsonGet(currentGame,"emulator-saves/save-state.json");
-   if(r?.data?.state){
-     cloud={
-       key:currentGame.saveKey,
-       bytes:new Blob([unb64(r.data.state)],{type:"application/octet-stream"}),
-       updatedAt:r.data.updatedAt||0,
-       buildSha:r.data.buildSha||null,
-       contentHash:r.data.contentHash||null,
-       cloud:true
-     };
-   }
- }
- let st=local;
- if(cloud&&(!local||cloud.updatedAt>local.updatedAt)){
-   st=cloud;
-   await put(STATES,cloud);
- }
- if(!st?.bytes)throw Error("Kein lokaler oder Cloud-Save-State vorhanden.");
+ const st=await newestSlot(slot);
+ if(!st?.bytes)throw Error("Slot "+slot+" ist leer.");
  if(st.buildSha&&currentGame.sha&&st.buildSha!==currentGame.sha){
-   const ok=confirm("Dieser Save State stammt aus einem anderen ROM-Build ("+st.buildSha.slice(0,7)+" statt "+currentGame.sha.slice(0,7)+"). Laden kann abstürzen oder Fehler verursachen. Trotzdem laden?");
+   const ok=confirm("Slot "+slot+" stammt aus einem anderen ROM-Build ("+st.buildSha.slice(0,7)+" statt "+currentGame.sha.slice(0,7)+"). Trotzdem laden?");
    if(!ok)return;
  }
  const bytes=new Uint8Array(await st.bytes.arrayBuffer());
  try{gm.loadState(bytes);}catch(e){throw Error("Save State konnte nicht geladen werden: "+e.message);}
- $("stateStatus").innerHTML='<span class="dot ok"></span>'+(st.cloud?"Cloud-State":"Lokaler State")+" geladen: "+fmt(st.updatedAt);
+ $("stateStatus").innerHTML='<span class="dot ok"></span>Slot '+slot+" geladen: "+fmt(st.updatedAt);
+ await updateStateUI();
 }
-async function updateSaveUI(){if(!currentGame)return;const s=await one(SAVES,currentGame.saveKey);$("downloadSaveBtn").disabled=!s;saveStatus.innerHTML=s?'<span class="dot ok"></span>Save: '+fmt(s.updatedAt)+(token()?" · Cloud aktiv":" · nur lokal"):'<span class="dot"></span>Noch kein Save erkannt'}
+async function updateSaveUI(){return}
+
 
 function cleanup(){if(romUrl)URL.revokeObjectURL(romUrl);romUrl=null;game.innerHTML="";document.getElementById("ejs-loader")?.remove()}
 async function startGame(id){const r=await one(ROMS,id);if(!r)return;cleanup();currentGame=r;r.lastPlayed=Date.now();await put(ROMS,r);if(token())try{await syncFromCloud(false)}catch(e){console.warn(e)}
  romUrl=URL.createObjectURL(r.blob);gameTitle.textContent=r.name.replace(/\.gba$/i,"");libraryPanel.classList.add("hidden");playerPanel.classList.remove("hidden");await updateSaveUI();await updateStateUI();
  window.EJS_player="#game";window.EJS_core="gba";window.EJS_gameName=r.saveKey;window.EJS_gameID=parseInt((r.contentHash||r.id).slice(0,8),16)||12345;window.EJS_gameUrl=romUrl;window.EJS_pathtodata="https://cdn.emulatorjs.org/4.2.3/data/";window.EJS_startOnLoaded=true;window.EJS_language="de-DE";window.EJS_fixedSaveInterval=10000;
- window.EJS_onGameStart=()=>setTimeout(injectLocalSave,900);
+ window.EJS_onGameStart=()=>setTimeout(()=>{injectLocalSave();game.focus({preventScroll:true})},900);
  window.EJS_onSaveUpdate=async e=>{try{const bytes=e?.save instanceof Uint8Array?e.save:new Uint8Array(e?.save||[]);if(!bytes.length)return;const s={key:r.saveKey,bytes:new Blob([bytes]),updatedAt:Date.now(),hash:e?.hash||null};await put(SAVES,s);await updateSaveUI();clearTimeout(cloudTimer);if(token())cloudTimer=setTimeout(()=>cloudPut(r.saveKey,s).catch(console.error),1800)}catch(err){console.error(err)}};
  const sc=document.createElement("script");sc.id="ejs-loader";sc.src="https://cdn.emulatorjs.org/4.2.3/data/loader.js";sc.async=true;sc.onerror=()=>alert("EmulatorJS konnte nicht geladen werden.");document.body.appendChild(sc)}
-$("stateSaveBtn").onclick=async()=>{try{await saveStateNow()}catch(e){alert(e.message)}};
-$("stateLoadBtn").onclick=async()=>{try{await loadStateNow()}catch(e){alert(e.message)}};
+document.querySelectorAll(".stateSaveSlot").forEach(b=>b.onclick=async()=>{try{await saveStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
+document.querySelectorAll(".stateLoadSlot").forEach(b=>b.onclick=async()=>{try{await loadStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
 $("backBtn").onclick=async()=>{cleanup();currentGame=null;playerPanel.classList.add("hidden");libraryPanel.classList.remove("hidden");render()};
-$("cloudPullBtn").onclick=async()=>{if(!currentGame)return;try{const ok=await syncFromCloud(true);if(ok){await injectLocalSave();alert("Cloud-Save geladen.")}else alert("Kein Cloud-Save gefunden.")}catch(e){alert(e.message)}};
-$("cloudPushBtn").onclick=async()=>{if(!currentGame)return;try{const s=await one(SAVES,currentGame.saveKey);if(!s)throw Error("Noch kein Save vorhanden.");await cloudPut(currentGame.saveKey,s);alert("Save in GitHub gespeichert.")}catch(e){alert(e.message)}};
-$("downloadSaveBtn").onclick=async()=>{if(!currentGame)return;const s=await one(SAVES,currentGame.saveKey);if(!s)return;const u=URL.createObjectURL(s.bytes),a=document.createElement("a");a.href=u;a.download=currentGame.name.replace(/\.gba$/i,"")+".sav";a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};
+
+// Prevent browser page scrolling while the emulator is active.
+window.addEventListener("keydown",e=>{
+ if(playerPanel.classList.contains("hidden"))return;
+ if(["INPUT","TEXTAREA","SELECT"].includes(document.activeElement?.tagName))return;
+ if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","Spacebar"].includes(e.key))e.preventDefault();
+},{capture:true,passive:false});
+game.addEventListener("pointerdown",()=>game.focus({preventScroll:true}));
 render();if(token()){$("connect").click()}
 </script></body></html>
