@@ -40,7 +40,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.19 · Emulator-Cleanup</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.20 · Turbo-Resume</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -129,7 +129,7 @@ const PROJECTS={
  smaragd:{key:"smaragd-plus",title:"Pokémon Smaragd Plus",repo:"domxx1/pokemon-smaragd-plus",branch:"feature/overworld-encounters",saveBranch:"cloud-saves",workflow:"Smaragd Plus Build",artifact:"smaragd-plus-test-build"},
  retronium:{key:"retronium",title:"Pokémon Retronium",repo:"domxx1/pokemon-retronium",branch:"feature/retro-platinum-restart",saveBranch:"cloud-saves",workflow:"Retronium Retro Platinum Base",artifact:"Pokemon-Retronium-Retro-Platinum-Basis"}
 };
-const $=id=>document.getElementById(id); let currentGame=null,romUrl=null,cloudTimer=null,speedMeterTimer=null,turboAudioState=null;
+const $=id=>document.getElementById(id); let currentGame=null,romUrl=null,cloudTimer=null,speedMeterTimer=null,turboAudioState=null,turboResumeTimer=null;
 const tokenInput=$("token"),ghStatus=$("ghStatus"),library=$("library"),libraryPanel=$("libraryPanel"),playerPanel=$("playerPanel"),game=$("game"),gameTitle=$("gameTitle"),saveStatus=$("saveStatus");
 const rememberToken=$("rememberToken");
 const storedToken=localStorage.getItem("ghTokenPersistent")||"";
@@ -369,7 +369,7 @@ async function updateSaveUI(){return}
 async function cleanup(waitForAbort=false){
  const old=window.EJS_emulator;
  try{setTurboPerformance(false)}catch(e){}
- clearInterval(speedMeterTimer);speedMeterTimer=null;
+ clearInterval(speedMeterTimer);speedMeterTimer=null;clearTimeout(turboResumeTimer);turboResumeTimer=null;
  clearTimeout(cloudTimer);cloudTimer=null;
 
  if(old){
@@ -399,7 +399,7 @@ async function cleanup(waitForAbort=false){
 async function startGame(id){const r=await one(ROMS,id);if(!r)return;await cleanup(true);currentGame=r;r.lastPlayed=Date.now();await put(ROMS,r);if(token())try{await syncFromCloud(false)}catch(e){console.warn(e)}
  romUrl=URL.createObjectURL(r.blob);gameTitle.textContent=r.name.replace(/\.gba$/i,"");libraryPanel.classList.add("hidden");playerPanel.classList.remove("hidden");await updateSaveUI();await updateStateUI();
  window.EJS_player="#game";window.EJS_core="gba";window.EJS_gameName=r.saveKey;window.EJS_gameID=parseInt((r.contentHash||r.id).slice(0,8),16)||12345;window.EJS_gameUrl=romUrl;window.EJS_pathtodata="https://cdn.emulatorjs.org/4.2.3/data/";window.EJS_startOnLoaded=true;window.EJS_language="de-DE";window.EJS_fixedSaveInterval=10000;
- window.EJS_onGameStart=()=>setTimeout(()=>{speedIndex=2;applyEmulatorSpeed();startSpeedMeter();injectLocalSave();game.focus({preventScroll:true})},900);
+ window.EJS_onGameStart=()=>setTimeout(()=>{speedIndex=2;applyEmulatorSpeed(false);startSpeedMeter();injectLocalSave();game.focus({preventScroll:true})},900);
  window.EJS_onSaveUpdate=async e=>{try{const bytes=e?.save instanceof Uint8Array?e.save:new Uint8Array(e?.save||[]);if(!bytes.length)return;const s={key:r.saveKey,bytes:new Blob([bytes]),updatedAt:Date.now(),hash:e?.hash||null};await put(SAVES,s);await updateSaveUI();clearTimeout(cloudTimer);if(token())cloudTimer=setTimeout(()=>cloudPut(r.saveKey,s).catch(console.error),1800)}catch(err){console.error(err)}};
  const sc=document.createElement("script");sc.id="ejs-loader";sc.src="https://cdn.emulatorjs.org/4.2.3/data/loader.js";sc.async=true;sc.onerror=()=>alert("EmulatorJS konnte nicht geladen werden.");document.body.appendChild(sc)}
 document.querySelectorAll(".stateSaveSlot").forEach(b=>b.onclick=async()=>{try{await saveStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
@@ -420,6 +420,23 @@ function updateSpeedUI(){
  if(label)label.textContent=speedText(v);
  $("speedSlow")?.classList.toggle("active",v<1);
  $("speedFast")?.classList.toggle("active",v>1);
+}
+function refreshEmulationLoop(){
+ const ejs=window.EJS_emulator;
+ if(!ejs?.started)return;
+ clearTimeout(turboResumeTimer);
+ try{
+  // A short pause/play cycle recreates the timing reset Chrome performs
+  // when the tab is backgrounded and brought back.
+  ejs.pause(true);
+  turboResumeTimer=setTimeout(()=>{
+   try{
+    ejs.play(true);
+    // Re-apply the selected throttle immediately after the loop restarts.
+    applyEmulatorSpeed(false);
+   }catch(err){console.warn("Turbo loop resume failed",err)}
+  },90);
+ }catch(err){console.warn("Turbo loop refresh failed",err)}
 }
 function setTurboPerformance(enabled){
  const ejs=window.EJS_emulator;
@@ -457,7 +474,7 @@ function syncSpeedMenuState(v){
  else if(v>1)ejs.allSettings["ff-ratio"]=Number(v).toFixed(1);
  if(!isMax&&v<1)ejs.allSettings["sm-ratio"]=Number(1/v).toFixed(1);
 }
-function applyEmulatorSpeed(){
+function applyEmulatorSpeed(refreshLoop=true){
  const ejs=window.EJS_emulator;
  const gm=ejs?.gameManager;
  if(!gm?.functions)return false;
@@ -494,6 +511,9 @@ function applyEmulatorSpeed(){
   }
   syncSpeedMenuState(v);
   updateSpeedUI();
+  if(refreshLoop&&(v==="max"||v>1)){
+   setTimeout(refreshEmulationLoop,25);
+  }
   return true;
  }catch(e){
   console.warn("Geschwindigkeit konnte nicht gesetzt werden",e);
@@ -566,6 +586,17 @@ window.addEventListener("keydown",e=>{
  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," ","Spacebar"].includes(e.key))e.preventDefault();
 },{capture:true,passive:false});
 game.addEventListener("pointerdown",()=>game.focus({preventScroll:true}));
+document.addEventListener("visibilitychange",()=>{
+ if(document.visibilityState!=="visible"||playerPanel.classList.contains("hidden"))return;
+ const v=SPEED_STEPS[speedIndex];
+ if(v==="max"||v>1){
+  // Chrome/Android may rebuild its timing state after returning to foreground.
+  // Re-apply our turbo settings after that resume has settled.
+  setTimeout(()=>{
+   try{applyEmulatorSpeed(false);startSpeedMeter()}catch(e){}
+  },180);
+ }
+});
 window.addEventListener("pagehide",()=>{
  try{
   const old=window.EJS_emulator;
