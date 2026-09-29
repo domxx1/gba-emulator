@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create an IPS32 patch and its checked metadata from two equal-sized GBA files."""
+"""Create an IPS32 patch and checked metadata from a GBA base and build."""
 import argparse
 import hashlib
 import json
@@ -18,18 +18,19 @@ def main():
     parser.add_argument("--url", default="", help="HTTPS URL to the published .ips32")
     args = parser.parse_args()
     base, build = args.base.read_bytes(), args.build.read_bytes()
-    if len(base) != len(build):
-        parser.error("IPS32 in this emulator requires matching ROM sizes.")
+    if len(base) > len(build):
+        parser.error("The base ROM cannot be larger than the build.")
     if len(build) > 32 * 1024 * 1024:
         parser.error("GBA ROM exceeds 32 MiB.")
+    padded_base = base + b"\xff" * (len(build) - len(base))
     patch = bytearray(b"IPS32")
     pos = 0
     while pos < len(build):
-        if base[pos] == build[pos]:
+        if padded_base[pos] == build[pos]:
             pos += 1
             continue
         start = pos
-        while pos < len(build) and base[pos] != build[pos] and pos - start < 65535:
+        while pos < len(build) and padded_base[pos] != build[pos] and pos - start < 65535:
             pos += 1
         patch.extend(start.to_bytes(4, "big"))
         patch.extend((pos - start).to_bytes(2, "big"))
@@ -38,7 +39,7 @@ def main():
     args.patch.write_bytes(patch)
     meta = dict(name=args.name, commit=args.commit, url=args.url,
                 baseSha256=digest(base), patchSha256=digest(patch),
-                resultSha256=digest(build))
+                resultSha256=digest(build), resultSize=len(build))
     args.patch.with_suffix(".json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
     print(f"{args.patch}: {len(patch):,} bytes; metadata: {args.patch.with_suffix('.json')}")
 
