@@ -40,7 +40,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.15 · Speed-Fix</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.16 · Speed-Diagnose</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -76,7 +76,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
  </div>
  <div class="speedTop">
   <button id="speedSlow" class="touchBtn speedBtn" data-speed="-1" aria-label="Langsamer" title="Langsamer">⏪</button>
-  <div id="speedValue" class="speedValue">1,0×</div>
+  <div class="speedValue"><div id="speedValue">1,0×</div><div id="speedActual" style="font-size:.62rem;color:var(--muted);margin-top:2px">real: --</div></div>
   <button id="speedFast" class="touchBtn speedBtn" data-speed="1" aria-label="Schneller" title="Schneller">⏩</button>
  </div>
  <div class="controlMain">
@@ -129,7 +129,7 @@ const PROJECTS={
  smaragd:{key:"smaragd-plus",title:"Pokémon Smaragd Plus",repo:"domxx1/pokemon-smaragd-plus",branch:"feature/overworld-encounters",saveBranch:"cloud-saves",workflow:"Smaragd Plus Build",artifact:"smaragd-plus-test-build"},
  retronium:{key:"retronium",title:"Pokémon Retronium",repo:"domxx1/pokemon-retronium",branch:"feature/retro-platinum-restart",saveBranch:"cloud-saves",workflow:"Retronium Retro Platinum Base",artifact:"Pokemon-Retronium-Retro-Platinum-Basis"}
 };
-const $=id=>document.getElementById(id); let currentGame=null,romUrl=null,cloudTimer=null;
+const $=id=>document.getElementById(id); let currentGame=null,romUrl=null,cloudTimer=null,speedMeterTimer=null;
 const tokenInput=$("token"),ghStatus=$("ghStatus"),library=$("library"),libraryPanel=$("libraryPanel"),playerPanel=$("playerPanel"),game=$("game"),gameTitle=$("gameTitle"),saveStatus=$("saveStatus");
 const rememberToken=$("rememberToken");
 const storedToken=localStorage.getItem("ghTokenPersistent")||"";
@@ -366,11 +366,11 @@ async function loadStateNow(slot){
 async function updateSaveUI(){return}
 
 
-function cleanup(){if(romUrl)URL.revokeObjectURL(romUrl);romUrl=null;game.innerHTML="";document.getElementById("ejs-loader")?.remove()}
+function cleanup(){clearInterval(speedMeterTimer);speedMeterTimer=null;if(romUrl)URL.revokeObjectURL(romUrl);romUrl=null;game.innerHTML="";document.getElementById("ejs-loader")?.remove()}
 async function startGame(id){const r=await one(ROMS,id);if(!r)return;cleanup();currentGame=r;r.lastPlayed=Date.now();await put(ROMS,r);if(token())try{await syncFromCloud(false)}catch(e){console.warn(e)}
  romUrl=URL.createObjectURL(r.blob);gameTitle.textContent=r.name.replace(/\.gba$/i,"");libraryPanel.classList.add("hidden");playerPanel.classList.remove("hidden");await updateSaveUI();await updateStateUI();
  window.EJS_player="#game";window.EJS_core="gba";window.EJS_gameName=r.saveKey;window.EJS_gameID=parseInt((r.contentHash||r.id).slice(0,8),16)||12345;window.EJS_gameUrl=romUrl;window.EJS_pathtodata="https://cdn.emulatorjs.org/4.2.3/data/";window.EJS_startOnLoaded=true;window.EJS_language="de-DE";window.EJS_fixedSaveInterval=10000;
- window.EJS_onGameStart=()=>setTimeout(()=>{speedIndex=2;applyEmulatorSpeed();injectLocalSave();game.focus({preventScroll:true})},900);
+ window.EJS_onGameStart=()=>setTimeout(()=>{speedIndex=2;applyEmulatorSpeed();startSpeedMeter();injectLocalSave();game.focus({preventScroll:true})},900);
  window.EJS_onSaveUpdate=async e=>{try{const bytes=e?.save instanceof Uint8Array?e.save:new Uint8Array(e?.save||[]);if(!bytes.length)return;const s={key:r.saveKey,bytes:new Blob([bytes]),updatedAt:Date.now(),hash:e?.hash||null};await put(SAVES,s);await updateSaveUI();clearTimeout(cloudTimer);if(token())cloudTimer=setTimeout(()=>cloudPut(r.saveKey,s).catch(console.error),1800)}catch(err){console.error(err)}};
  const sc=document.createElement("script");sc.id="ejs-loader";sc.src="https://cdn.emulatorjs.org/4.2.3/data/loader.js";sc.async=true;sc.onerror=()=>alert("EmulatorJS konnte nicht geladen werden.");document.body.appendChild(sc)}
 document.querySelectorAll(".stateSaveSlot").forEach(b=>b.onclick=async()=>{try{await saveStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
@@ -392,31 +392,70 @@ function updateSpeedUI(){
  $("speedSlow")?.classList.toggle("active",v<1);
  $("speedFast")?.classList.toggle("active",v>1);
 }
+function syncSpeedMenuState(v){
+ const ejs=window.EJS_emulator;
+ if(!ejs)return;
+ ejs.allSettings=ejs.allSettings||{};
+ ejs.allSettings.fastForward=v>1?"enabled":"disabled";
+ ejs.allSettings.slowMotion=v<1?"enabled":"disabled";
+ if(v>1)ejs.allSettings["ff-ratio"]=Number(v).toFixed(1);
+ if(v<1)ejs.allSettings["sm-ratio"]=Number(1/v).toFixed(1);
+}
 function applyEmulatorSpeed(){
  const ejs=window.EJS_emulator;
- if(!ejs?.gameManager)return false;
+ const gm=ejs?.gameManager;
+ if(!gm?.functions)return false;
  const v=SPEED_STEPS[speedIndex];
  try{
-  // Use EmulatorJS' own settings path so core state, menu state and our UI stay synchronized.
-  if(v===1){
-   ejs.menuOptionChanged("fastForward","disabled");
-   ejs.menuOptionChanged("slowMotion","disabled");
-  }else if(v>1){
-   ejs.menuOptionChanged("slowMotion","disabled");
-   ejs.menuOptionChanged("ff-ratio",Number(v).toFixed(1));
-   ejs.menuOptionChanged("fastForward","enabled");
+  // Reset both throttle modes first.
+  gm.functions.toggleFastForward(0);
+  gm.functions.toggleSlowMotion(0);
+  ejs.isFastForward=false;
+  ejs.isSlowMotion=false;
+
+  if(v>1){
+   // The 4.2.3 web core starts with VSync enabled. Release it while fast-forwarding.
+   if(gm.functions.setVSync)gm.functions.setVSync(0);
+   gm.functions.setFastForwardRatio(v);
+   ejs.isFastForward=true;
+   gm.functions.toggleFastForward(1);
+  }else if(v<1){
+   if(gm.functions.setVSync)gm.functions.setVSync(1);
+   gm.functions.setSlowMotionRatio(1/v);
+   ejs.isSlowMotion=true;
+   gm.functions.toggleSlowMotion(1);
   }else{
-   ejs.menuOptionChanged("fastForward","disabled");
-   const ratio=1/v;
-   ejs.menuOptionChanged("sm-ratio",Number(ratio).toFixed(1));
-   ejs.menuOptionChanged("slowMotion","enabled");
+   if(gm.functions.setVSync)gm.functions.setVSync(1);
   }
+  syncSpeedMenuState(v);
   updateSpeedUI();
   return true;
  }catch(e){
   console.warn("Geschwindigkeit konnte nicht gesetzt werden",e);
   return false;
  }
+}
+function startSpeedMeter(){
+ clearInterval(speedMeterTimer);
+ speedMeterTimer=null;
+ const actual=$("speedActual");
+ let lastFrame=null,lastTime=null;
+ speedMeterTimer=setInterval(()=>{
+  const gm=window.EJS_emulator?.gameManager;
+  if(!gm?.functions?.getFrameNum)return;
+  try{
+   const frame=Number(gm.functions.getFrameNum());
+   const now=performance.now();
+   if(lastFrame!==null&&lastTime!==null){
+    let delta=frame-lastFrame;
+    if(delta<0)delta=0;
+    const fps=delta*1000/(now-lastTime);
+    const real=fps/59.7275;
+    if(actual&&Number.isFinite(real))actual.textContent="real: "+real.toFixed(1).replace(".",",")+"×";
+   }
+   lastFrame=frame;lastTime=now;
+  }catch(e){}
+ },1200);
 }
 document.querySelectorAll("#mobileControls [data-speed]").forEach(btn=>{
  btn.addEventListener("click",e=>{
