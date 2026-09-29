@@ -19,7 +19,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.4 · Save States</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.5 · EJS 4.2.3</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -42,12 +42,12 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 
 <section id="playerPanel" class="panel hidden">
 <div class="player-head"><div><div class="muted">AKTIVES SPIEL</div><strong id="gameTitle">Game Boy Advance</strong></div><button id="backBtn">← Bibliothek</button></div>
-<div id="game"></div>
-<div class="savebar">
+<div class="savebar" style="margin-top:0;margin-bottom:10px">
 <div id="stateStatus" class="save-status"><span class="dot"></span>Noch kein Save State</div>
 <button id="stateSaveBtn" class="primary">Save State</button>
 <button id="stateLoadBtn" disabled>State laden</button>
 </div>
+<div id="game"></div>
 <div class="savebar">
 <div id="saveStatus" class="save-status"><span class="dot"></span>Noch kein Ingame-Save erkannt</div>
 <button id="cloudPullBtn">Cloud-Save laden</button>
@@ -155,10 +155,10 @@ async function updateSaveUI(){if(!currentGame)return;const s=await one(SAVES,cur
 function cleanup(){if(romUrl)URL.revokeObjectURL(romUrl);romUrl=null;game.innerHTML="";document.getElementById("ejs-loader")?.remove()}
 async function startGame(id){const r=await one(ROMS,id);if(!r)return;cleanup();currentGame=r;r.lastPlayed=Date.now();await put(ROMS,r);if(token())try{await syncFromCloud(false)}catch(e){console.warn(e)}
  romUrl=URL.createObjectURL(r.blob);gameTitle.textContent=r.name.replace(/\.gba$/i,"");libraryPanel.classList.add("hidden");playerPanel.classList.remove("hidden");await updateSaveUI();await updateStateUI();
- window.EJS_player="#game";window.EJS_core="gba";window.EJS_gameName=r.saveKey;window.EJS_gameID=parseInt((r.contentHash||r.id).slice(0,8),16)||12345;window.EJS_gameUrl=romUrl;window.EJS_pathtodata="https://cdn.emulatorjs.org/stable/data/";window.EJS_startOnLoaded=true;window.EJS_language="de-DE";window.EJS_fixedSaveInterval=10000;
+ window.EJS_player="#game";window.EJS_core="gba";window.EJS_gameName=r.saveKey;window.EJS_gameID=parseInt((r.contentHash||r.id).slice(0,8),16)||12345;window.EJS_gameUrl=romUrl;window.EJS_pathtodata="https://cdn.emulatorjs.org/4.2.3/data/";window.EJS_startOnLoaded=true;window.EJS_language="de-DE";window.EJS_fixedSaveInterval=10000;
  window.EJS_onGameStart=()=>setTimeout(injectLocalSave,900);
  window.EJS_onSaveUpdate=async e=>{try{const bytes=e?.save instanceof Uint8Array?e.save:new Uint8Array(e?.save||[]);if(!bytes.length)return;const s={key:r.saveKey,bytes:new Blob([bytes]),updatedAt:Date.now(),hash:e?.hash||null};await put(SAVES,s);await updateSaveUI();clearTimeout(cloudTimer);if(token())cloudTimer=setTimeout(()=>cloudPut(r.saveKey,s).catch(console.error),1800)}catch(err){console.error(err)}};
- const sc=document.createElement("script");sc.id="ejs-loader";sc.src="https://cdn.emulatorjs.org/stable/data/loader.js";sc.async=true;sc.onerror=()=>alert("EmulatorJS konnte nicht geladen werden.");document.body.appendChild(sc)}
+ const sc=document.createElement("script");sc.id="ejs-loader";sc.src="https://cdn.emulatorjs.org/4.2.3/data/loader.js";sc.async=true;sc.onerror=()=>alert("EmulatorJS konnte nicht geladen werden.");document.body.appendChild(sc)}
 $("stateSaveBtn").onclick=async()=>{try{await saveStateNow()}catch(e){alert(e.message)}};
 $("stateLoadBtn").onclick=async()=>{try{await loadStateNow()}catch(e){alert(e.message)}};
 $("backBtn").onclick=async()=>{cleanup();currentGame=null;playerPanel.classList.add("hidden");libraryPanel.classList.remove("hidden");render()};
