@@ -54,7 +54,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 <section id="libraryPanel" class="panel">
 <h2>Unsere aktuellen Builds</h2>
 <div class="projects">
- <div class="card"><strong>Pokémon Smaragd Plus</strong><div class="meta">feature/overworld-encounters · Test-GBA aus Drive auswählen</div><div class="actions"><a class="file" href="https://drive.google.com/drive/folders/1Mgl_f3NZuXKzYCkYfuj4zGo9ja2_Gb0l" target="_blank" rel="noopener">Drive-Testbuilds</a><label class="file primary">GBA importieren<input class="projectRomInput" data-project="smaragd" type="file" multiple></label><button class="projectBtn" data-project="smaragd">GitHub-Build laden</button></div><div class="actions"><label class="file">Basis-ROM einmal hinterlegen<input id="smaragdBaseInput" type="file" accept=".gba"></label><label class="file">Patch importieren<input id="smaragdPatchInput" type="file" accept=".ips32"></label><button id="smaragdPatchRefresh">GitHub-Patches anzeigen</button></div><div id="smaragdPatchList" class="library"></div><div id="smaragdStatus" class="status">GBA aus Drive herunterladen und hier importieren. Ältere Testbuilds bleiben auswählbar.</div></div>
+ <div class="card"><strong>Pokémon Smaragd Plus</strong><div class="meta">feature/overworld-encounters · private Teststände aus GitHub</div><div class="actions"><label class="file">Basis-ROM einmal hinterlegen<input id="smaragdBaseInput" type="file" accept=".gba"></label><button id="smaragdPatchRefresh" class="primary">GitHub-Teststände anzeigen</button><button id="smaragdRestoreSave">Letzten Spielstand wiederherstellen</button></div><div id="smaragdPatchList" class="library"></div><div class="actions"><label class="file">GBA importieren<input class="projectRomInput" data-project="smaragd" type="file" multiple></label><label class="file">Patch importieren<input id="smaragdPatchInput" type="file" accept=".ips32"></label><button class="projectBtn" data-project="smaragd">Actions-Build laden</button></div><div id="smaragdStatus" class="status">GitHub verbinden, Basis-ROM einmal hinterlegen und Teststand auswählen. Bestehende Spielstände bleiben erhalten.</div></div>
  <div class="card"><strong>Pokémon Retronium</strong><div class="meta">feature/retro-platinum-restart · Test-GBA importieren</div><div class="actions"><label class="file primary">GBA importieren<input class="projectRomInput" data-project="retronium" type="file" multiple></label><button class="projectBtn" data-project="retronium">GitHub-Build laden</button></div><div id="retroniumStatus" class="status"></div></div>
 </div>
 <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
@@ -195,6 +195,7 @@ $("connect").onclick=async()=>{
    const u=await r.json();
    ghStatus.textContent="Verbunden als "+u.login+(rememberToken.checked?" · Token auf diesem Gerät gespeichert":" · nur für diese Sitzung")+" · private Builds + Cloud-Saves aktiv";
    await refreshCloudLabels();
+   await showPatches();
  }catch(e){
    sessionStorage.removeItem("ghToken");
    if(!rememberToken.checked)localStorage.removeItem("ghTokenPersistent");
@@ -212,7 +213,7 @@ $("forgetToken").onclick=()=>{
  rememberToken.checked=false;
  ghStatus.textContent="Gespeicherter Token wurde von diesem Gerät entfernt.";
 };
-async function refreshCloudLabels(){for(const [id,p] of Object.entries(PROJECTS)){try{const r=await latestRun(p);$(id+"Status").textContent="Letzter erfolgreicher Build: "+r.head_sha.slice(0,7)+" · "+fmt(r.created_at)}catch(e){$(id+"Status").textContent=e.message}}}
+async function refreshCloudLabels(){for(const [id,p] of Object.entries(PROJECTS)){if(id==="smaragd")continue;try{const r=await latestRun(p);$(id+"Status").textContent="Letzter erfolgreicher Build: "+r.head_sha.slice(0,7)+" · "+fmt(r.created_at)}catch(e){$(id+"Status").textContent=e.message}}}
 async function latestRun(p){const head=await (await gh("https://api.github.com/repos/"+p.repo+"/branches/"+encodeURIComponent(p.branch))).json();const u="https://api.github.com/repos/"+p.repo+"/actions/runs?branch="+encodeURIComponent(p.branch)+"&status=success&per_page=30";const j=await (await gh(u)).json();const r=(j.workflow_runs||[]).find(x=>x.name===p.workflow&&x.head_sha===head.commit.sha);if(!r)throw Error("Kein erfolgreicher GitHub-Build für den aktuellen Commit. Test-GBA importieren.");return r}
 async function loadProject(id){
  const p=PROJECTS[id],st=$(id+"Status");try{
@@ -267,7 +268,7 @@ document.querySelectorAll(".projectBtn").forEach(b=>b.onclick=()=>loadProject(b.
   // Preserve the shared in-game save before playing a new build.
   const save=await one(SAVES,PROJECTS.smaragd.key);
   if(save?.bytes)await put(SAVES,{...save,key:PROJECTS.smaragd.key+":backup:"+hash,backupAt:Date.now()});
-  await render();$("smaragdStatus").textContent="Patch installiert: "+meta.name+" · Spielstand gesichert.";return id;
+  await render();$("smaragdStatus").textContent="Patch installiert: "+meta.name+(save?.bytes?" · Spielstand gesichert.":" · Noch kein Spielstand vorhanden.");return id;
  }
  $("smaragdBaseInput").onchange=async e=>{try{if(e.target.files[0])await importBase(e.target.files[0])}catch(err){$("smaragdStatus").textContent=err.message}finally{e.target.value=""}};
  $("smaragdPatchInput").onchange=async e=>{try{
@@ -319,6 +320,13 @@ document.querySelectorAll(".projectBtn").forEach(b=>b.onclick=()=>loadProject(b.
   }catch(e){list.textContent=e.message}
  }
  $("smaragdPatchRefresh").onclick=showPatches;
+ $("smaragdRestoreSave").onclick=async()=>{
+  const backups=(await all(SAVES)).filter(s=>s.key?.startsWith(PROJECTS.smaragd.key+":backup:")).sort((a,b)=>(b.backupAt||0)-(a.backupAt||0));
+  if(!backups.length){$("smaragdStatus").textContent="Noch keine Spielstand-Sicherung vorhanden.";return}
+  if(!confirm("Letzte Spielstand-Sicherung vom "+fmt(backups[0].backupAt)+" wiederherstellen? Danach das Spiel neu starten."))return;
+  await put(SAVES,{...backups[0],key:PROJECTS.smaragd.key,updatedAt:Date.now()});
+  $("smaragdStatus").textContent="Spielstand wiederhergestellt. Spiel neu starten, um ihn zu laden.";
+ };
  document.querySelectorAll(".projectRomInput").forEach(input=>input.onchange=async e=>{const p=PROJECTS[input.dataset.project],files=[...e.target.files].filter(f=>/\.gba$/i.test(f.name)),st=$(input.dataset.project+"Status");try{if(!files.length)throw Error("Bitte eine .gba-Datei wählen.");for(const f of files){const hash=await sha256(f),id=p.key+":"+hash;const old=await one(ROMS,id);await put(ROMS,{id,saveKey:p.key,name:f.name,blob:f.slice(0,f.size,"application/octet-stream"),source:"manual",repo:p.repo,branch:p.branch,contentHash:hash,addedAt:old?.addedAt||Date.now(),lastPlayed:old?.lastPlayed||0})}st.textContent=files.length+" Testbuild(s) importiert. Ältere Versionen bleiben in der Bibliothek.";await render();}catch(err){st.textContent="Fehler: "+err.message}finally{input.value=""}});
 
 $("romInput").onchange=async e=>{for(const f of [...e.target.files]){if(!/\.gba$/i.test(f.name))continue;const id=await sha256(f),old=await one(ROMS,id);await put(ROMS,{id,saveKey:id,name:f.name,blob:f.slice(0,f.size,"application/octet-stream"),source:"local",addedAt:old?.addedAt||Date.now(),lastPlayed:old?.lastPlayed||0})}e.target.value="";render()};
