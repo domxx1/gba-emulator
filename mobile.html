@@ -40,7 +40,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.14 · Speed 10x</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.15 · Speed-Fix</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -370,7 +370,7 @@ function cleanup(){if(romUrl)URL.revokeObjectURL(romUrl);romUrl=null;game.innerH
 async function startGame(id){const r=await one(ROMS,id);if(!r)return;cleanup();currentGame=r;r.lastPlayed=Date.now();await put(ROMS,r);if(token())try{await syncFromCloud(false)}catch(e){console.warn(e)}
  romUrl=URL.createObjectURL(r.blob);gameTitle.textContent=r.name.replace(/\.gba$/i,"");libraryPanel.classList.add("hidden");playerPanel.classList.remove("hidden");await updateSaveUI();await updateStateUI();
  window.EJS_player="#game";window.EJS_core="gba";window.EJS_gameName=r.saveKey;window.EJS_gameID=parseInt((r.contentHash||r.id).slice(0,8),16)||12345;window.EJS_gameUrl=romUrl;window.EJS_pathtodata="https://cdn.emulatorjs.org/4.2.3/data/";window.EJS_startOnLoaded=true;window.EJS_language="de-DE";window.EJS_fixedSaveInterval=10000;
- window.EJS_onGameStart=()=>setTimeout(()=>{speedIndex=3;applyEmulatorSpeed();injectLocalSave();game.focus({preventScroll:true})},900);
+ window.EJS_onGameStart=()=>setTimeout(()=>{speedIndex=2;applyEmulatorSpeed();injectLocalSave();game.focus({preventScroll:true})},900);
  window.EJS_onSaveUpdate=async e=>{try{const bytes=e?.save instanceof Uint8Array?e.save:new Uint8Array(e?.save||[]);if(!bytes.length)return;const s={key:r.saveKey,bytes:new Blob([bytes]),updatedAt:Date.now(),hash:e?.hash||null};await put(SAVES,s);await updateSaveUI();clearTimeout(cloudTimer);if(token())cloudTimer=setTimeout(()=>cloudPut(r.saveKey,s).catch(console.error),1800)}catch(err){console.error(err)}};
  const sc=document.createElement("script");sc.id="ejs-loader";sc.src="https://cdn.emulatorjs.org/4.2.3/data/loader.js";sc.async=true;sc.onerror=()=>alert("EmulatorJS konnte nicht geladen werden.");document.body.appendChild(sc)}
 document.querySelectorAll(".stateSaveSlot").forEach(b=>b.onclick=async()=>{try{await saveStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
@@ -379,8 +379,8 @@ $("quickLoadBtn").onclick=async()=>{try{await loadStateNow(1)}catch(e){alert(e.m
 $("quickSaveBtn").onclick=async()=>{try{await saveStateNow(1,false)}catch(e){alert(e.message)}};
 $("backBtn").onclick=async()=>{cleanup();currentGame=null;playerPanel.classList.add("hidden");libraryPanel.classList.remove("hidden");render()};
 
-const SPEED_STEPS=[0.5,0.67,0.8,1,1.25,1.5,2,3,4,5,6,8,10];
-let speedIndex=3;
+const SPEED_STEPS=[0.5,0.67,1,1.5,2,3,4,5,6,8,10];
+let speedIndex=2;
 
 function speedText(v){
  return String(v).replace(".",",")+"×";
@@ -393,18 +393,23 @@ function updateSpeedUI(){
  $("speedFast")?.classList.toggle("active",v>1);
 }
 function applyEmulatorSpeed(){
- const gm=window.EJS_emulator?.gameManager;
- if(!gm)return false;
+ const ejs=window.EJS_emulator;
+ if(!ejs?.gameManager)return false;
  const v=SPEED_STEPS[speedIndex];
  try{
-  gm.functions.toggleFastForward(0);
-  gm.functions.toggleSlowMotion(0);
-  if(v>1){
-   gm.functions.setFastForwardRatio(v);
-   gm.functions.toggleFastForward(1);
-  }else if(v<1){
-   gm.functions.setSlowMotionRatio(1/v);
-   gm.functions.toggleSlowMotion(1);
+  // Use EmulatorJS' own settings path so core state, menu state and our UI stay synchronized.
+  if(v===1){
+   ejs.menuOptionChanged("fastForward","disabled");
+   ejs.menuOptionChanged("slowMotion","disabled");
+  }else if(v>1){
+   ejs.menuOptionChanged("slowMotion","disabled");
+   ejs.menuOptionChanged("ff-ratio",Number(v).toFixed(1));
+   ejs.menuOptionChanged("fastForward","enabled");
+  }else{
+   ejs.menuOptionChanged("fastForward","disabled");
+   const ratio=1/v;
+   ejs.menuOptionChanged("sm-ratio",Number(ratio).toFixed(1));
+   ejs.menuOptionChanged("slowMotion","enabled");
   }
   updateSpeedUI();
   return true;
