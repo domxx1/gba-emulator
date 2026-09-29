@@ -40,7 +40,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.16 · Speed-Diagnose</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.17 · MAX-Turbo</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -379,11 +379,11 @@ $("quickLoadBtn").onclick=async()=>{try{await loadStateNow(1)}catch(e){alert(e.m
 $("quickSaveBtn").onclick=async()=>{try{await saveStateNow(1,false)}catch(e){alert(e.message)}};
 $("backBtn").onclick=async()=>{cleanup();currentGame=null;playerPanel.classList.add("hidden");libraryPanel.classList.remove("hidden");render()};
 
-const SPEED_STEPS=[0.5,0.67,1,1.5,2,3,4,5,6,8,10];
+const SPEED_STEPS=[0.5,0.67,1,1.5,2,3,4,5,6,8,10,"max"];
 let speedIndex=2;
 
 function speedText(v){
- return String(v).replace(".",",")+"×";
+ return v==="max"?"MAX":String(v).replace(".",",")+"×";
 }
 function updateSpeedUI(){
  const v=SPEED_STEPS[speedIndex];
@@ -396,10 +396,12 @@ function syncSpeedMenuState(v){
  const ejs=window.EJS_emulator;
  if(!ejs)return;
  ejs.allSettings=ejs.allSettings||{};
- ejs.allSettings.fastForward=v>1?"enabled":"disabled";
- ejs.allSettings.slowMotion=v<1?"enabled":"disabled";
- if(v>1)ejs.allSettings["ff-ratio"]=Number(v).toFixed(1);
- if(v<1)ejs.allSettings["sm-ratio"]=Number(1/v).toFixed(1);
+ const isMax=v==="max";
+ ejs.allSettings.fastForward=(isMax||v>1)?"enabled":"disabled";
+ ejs.allSettings.slowMotion=(!isMax&&v<1)?"enabled":"disabled";
+ if(isMax)ejs.allSettings["ff-ratio"]="unlimited";
+ else if(v>1)ejs.allSettings["ff-ratio"]=Number(v).toFixed(1);
+ if(!isMax&&v<1)ejs.allSettings["sm-ratio"]=Number(1/v).toFixed(1);
 }
 function applyEmulatorSpeed(){
  const ejs=window.EJS_emulator;
@@ -413,7 +415,13 @@ function applyEmulatorSpeed(){
   ejs.isFastForward=false;
   ejs.isSlowMotion=false;
 
-  if(v>1){
+  if(v==="max"){
+   // RetroArch uses ratio 0 for unlimited fast-forward.
+   if(gm.functions.setVSync)gm.functions.setVSync(0);
+   gm.functions.setFastForwardRatio(0);
+   ejs.isFastForward=true;
+   gm.functions.toggleFastForward(1);
+  }else if(v>1){
    // The 4.2.3 web core starts with VSync enabled. Release it while fast-forwarding.
    if(gm.functions.setVSync)gm.functions.setVSync(0);
    gm.functions.setFastForwardRatio(v);
