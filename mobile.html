@@ -230,7 +230,7 @@ async function loadProject(id){
 document.querySelectorAll(".projectBtn").forEach(b=>b.onclick=()=>loadProject(b.dataset.project));
 
  // IPS32 patches are applied to an exact local base ROM. The base never leaves this device.
- const PATCH_INDEX="smaragd-patches.json", BASE_ID="smaragd-plus:base";
+ const PATCH_BRANCH="feature/overworld-encounters", PATCH_INDEX="testbuilds/index.json", BASE_ID="smaragd-plus:base";
  async function importBase(file){
   if(!/\.gba$/i.test(file.name))throw Error("Bitte eine .gba-Datei als Basis wählen.");
   const hash=await sha256(file);
@@ -276,11 +276,35 @@ document.querySelectorAll(".projectBtn").forEach(b=>b.onclick=()=>loadProject(b.
   if(!metaFile)return;
   await installPatch(f,JSON.parse(metaFile));
  }catch(err){$("smaragdStatus").textContent="Fehler: "+err.message}finally{e.target.value=""}};
+ async function patchRepoFile(path){
+  if(!/^testbuilds\/[A-Za-z0-9._/-]+$/.test(path)||path.includes(".."))throw Error("Ungültiger Patch-Pfad.");
+  const url="https://api.github.com/repos/"+PROJECTS.smaragd.repo+"/contents/"+path+"?ref="+encodeURIComponent(PATCH_BRANCH);
+  const data=await (await gh(url)).json();
+  if(!data.content||data.encoding!=="base64")throw Error("GitHub liefert keine Datei: "+path);
+  return unb64(data.content.replace(/\s/g,""));
+ }
+ async function downloadPrivatePatch(m){
+  if(m.compression!=="gzip"||!Array.isArray(m.chunks)||!m.chunks.length||m.chunks.length>128)throw Error("Patchliste enthält ungültige Teile.");
+  if(typeof DecompressionStream==="undefined")throw Error("Dieser Browser unterstützt die Patch-Entpackung nicht.");
+  const parts=new Array(m.chunks.length),status=$("smaragdStatus");
+  for(let i=0;i<m.chunks.length;i+=4){
+   const group=await Promise.all(m.chunks.slice(i,i+4).map(async(path,j)=>{
+    const encoded=await patchRepoFile(path);
+    return unb64(new TextDecoder().decode(encoded));
+   }));
+   group.forEach((bytes,j)=>parts[i+j]=bytes);
+   status.textContent="Lade privaten Patch: "+Math.min(i+4,m.chunks.length)+"/"+m.chunks.length+" Teile.";
+  }
+  const size=parts.reduce((n,p)=>n+p.length,0),compressed=new Uint8Array(size);
+  let pos=0;for(const part of parts){compressed.set(part,pos);pos+=part.length}
+  if(m.compressedSha256&&(await sha256(new Blob([compressed]))).toLowerCase()!==m.compressedSha256.toLowerCase())throw Error("Komprimierter Patch ist beschädigt.");
+  return new Response(new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"))).blob();
+ }
  async function showPatches(){
   const list=$("smaragdPatchList");list.textContent="Lade Patchliste…";
   try{
-   const response=await fetch(PATCH_INDEX,{cache:"no-store"});if(!response.ok)throw Error("Noch keine Patchliste veröffentlicht.");
-   const entries=await response.json();if(!Array.isArray(entries))throw Error("Patchliste ungültig.");
+   const entries=JSON.parse(new TextDecoder().decode(await patchRepoFile(PATCH_INDEX)));
+   if(!Array.isArray(entries))throw Error("Patchliste ungültig.");
    list.textContent="";
    if(!entries.length){list.textContent="Noch keine Patches veröffentlicht.";return}
    for(const m of entries){
@@ -288,10 +312,7 @@ document.querySelectorAll(".projectBtn").forEach(b=>b.onclick=()=>loadProject(b.
     const name=document.createElement("strong");name.textContent=m.name||"Patch";
     const button=document.createElement("button");button.textContent="Laden und spielen";
     button.onclick=async()=>{button.disabled=true;try{
-     const url=new URL(m.url,location.href);
-     if(url.protocol!=="https:"||!["github.com","api.github.com","objects.githubusercontent.com","release-assets.githubusercontent.com",location.hostname].includes(url.hostname))throw Error("Patch-URL nicht erlaubt.");
-     const response=await fetch(url);if(!response.ok)throw Error("Download fehlgeschlagen: "+response.status);
-     const id=await installPatch(await response.blob(),m);await startGame(id);
+     const id=await installPatch(await downloadPrivatePatch(m),m);await startGame(id);
     }catch(err){$("smaragdStatus").textContent="Fehler: "+err.message}finally{button.disabled=false}};
     row.append(name,button);list.append(row);
    }
