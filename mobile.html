@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d1017">
+<title>GBA Cloud</title>
+<style>
+*{box-sizing:border-box}
+:root{--bg:#0d1017;--panel:#161b26;--panel2:#202735;--line:#2c3545;--text:#f6f7fb;--muted:#98a4b5;--accent:#38bdf8;--ok:#4ade80;--warn:#fbbf24;--danger:#ef4444}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{padding:14px;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(14px,env(safe-area-inset-bottom))}
+.wrap{max-width:950px;margin:auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+h1{font-size:1.45rem;margin:0} h2{font-size:1.05rem;margin:0 0 12px}
+.badge{font-size:.72rem;border:1px solid var(--line);background:var(--panel);padding:6px 9px;border-radius:999px;color:var(--muted)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:14px;margin-bottom:12px}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+button,.file{border:0;border-radius:10px;padding:10px 13px;font:inherit;font-weight:700;cursor:pointer}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+button.primary,.file.primary{background:var(--accent);color:#04131c;border:0}
+button.danger{color:#fecaca;background:#35191b}
+button:disabled{opacity:.4;cursor:not-allowed}
+.file input{display:none}
+.muted{color:var(--muted);font-size:.85rem}
+.library{display:grid;gap:8px;margin-top:12px}
+.game-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:11px;background:#111722;border:1px solid var(--line);border-radius:12px}
+.game-title{font-weight:750;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{font-size:.76rem;color:var(--muted);margin-top:3px}
+.card-buttons{display:flex;gap:6px}
+.card-buttons button{padding:8px 10px}
+.player-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+#game{width:100%;aspect-ratio:4/3;background:#000;border-radius:12px;overflow:hidden;min-height:280px}
+#game canvas{max-width:100%!important;max-height:100%!important}
+.savebar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.save-status{flex:1;min-width:190px;font-size:.8rem;color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:var(--warn)}
+.dot.ok{background:var(--ok)}
+.empty{text-align:center;padding:18px;color:var(--muted);border:1px dashed var(--line);border-radius:12px}
+.note{font-size:.76rem;color:var(--muted);line-height:1.45}
+.hidden{display:none!important}
+@media(max-width:650px){
+  body{padding-left:9px;padding-right:9px}
+  .panel{padding:11px;border-radius:12px}
+  .game-card{grid-template-columns:1fr}
+  .card-buttons button{flex:1}
+  .card-buttons{width:100%}
+  #game{min-height:260px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>GBA Cloud</h1>
+  <span class="badge">v0.2 · lokal</span>
+</header>
+
+<section id="libraryPanel" class="panel">
+  <h2>Spielebibliothek</h2>
+  <div class="actions">
+    <label class="file primary">+ GBA hinzufügen<input id="romInput" type="file" accept=".gba,application/octet-stream" multiple></label>
+  </div>
+  <div id="library" class="library"></div>
+</section>
+
+<section id="playerPanel" class="panel hidden">
+  <div class="player-head">
+    <div>
+      <div class="muted">AKTIVES SPIEL</div>
+      <strong id="gameTitle">Game Boy Advance</strong>
+    </div>
+    <button id="backBtn">← Bibliothek</button>
+  </div>
+
+  <div id="game"></div>
+
+  <div class="savebar">
+    <div id="saveStatus" class="save-status"><span class="dot"></span>Noch kein Save erkannt</div>
+    <button id="downloadSaveBtn" disabled>Save herunterladen</button>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Speicherstände</h2>
+  <div class="note">
+    Normale Ingame-Saves werden von EmulatorJS im Browser gespeichert. Zusätzlich legt diese WebApp bei jeder erkannten Save-Änderung eine lokale Sicherung an. So haben wir die Grundlage, diese Sicherungen im nächsten Schritt zwischen PC und Smartphone zu synchronisieren.
+  </div>
+</section>
+</div>
+
+<script>
+const DB_NAME="gba-cloud-v02";
+const ROM_STORE="roms";
+const SAVE_STORE="saves";
+
+const romInput=document.getElementById("romInput");
+const library=document.getElementById("library");
+const libraryPanel=document.getElementById("libraryPanel");
+const playerPanel=document.getElementById("playerPanel");
+const game=document.getElementById("game");
+const gameTitle=document.getElementById("gameTitle");
+const backBtn=document.getElementById("backBtn");
+const saveStatus=document.getElementById("saveStatus");
+const downloadSaveBtn=document.getElementById("downloadSaveBtn");
+
+let currentGame=null;
+let currentObjectUrl=null;
+
+function openDb(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(DB_NAME,1);
+    req.onupgradeneeded=()=>{
+      const db=req.result;
+      if(!db.objectStoreNames.contains(ROM_STORE)) db.createObjectStore(ROM_STORE,{keyPath:"id"});
+      if(!db.objectStoreNames.contains(SAVE_STORE)) db.createObjectStore(SAVE_STORE,{keyPath:"gameId"});
+    };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+
+async function getAll(store){
+  const db=await openDb();
+  return new Promise((resolve,reject)=>{
+    const t=db.transaction(store,"readonly");
+    const req=t.objectStore(store).getAll();
+    req.onsuccess=()=>resolve(req.result||[]);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function getOne(store,key){
+  const db=await openDb();
+  return new Promise((resolve,reject)=>{
+    const t=db.transaction(store,"readonly");
+    const req=t.objectStore(store).get(key);
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function putOne(store,value){
+  const db=await openDb();
+  return new Promise((resolve,reject)=>{
+    const t=db.transaction(store,"readwrite");
+    t.objectStore(store).put(value);
+    t.oncomplete=()=>resolve();
+    t.onerror=()=>reject(t.error);
+  });
+}
+async function delOne(store,key){
+  const db=await openDb();
+  return new Promise((resolve,reject)=>{
+    const t=db.transaction(store,"readwrite");
+    t.objectStore(store).delete(key);
+    t.oncomplete=()=>resolve();
+    t.onerror=()=>reject(t.error);
+  });
+}
+
+async function hashFile(file){
+  const buffer=await file.arrayBuffer();
+  const hash=await crypto.subtle.digest("SHA-256",buffer);
+  return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+function fmtDate(ts){
+  if(!ts) return "noch nie";
+  return new Intl.DateTimeFormat("de-DE",{dateStyle:"short",timeStyle:"short"}).format(new Date(ts));
+}
+
+async function renderLibrary(){
+  const roms=(await getAll(ROM_STORE)).sort((a,b)=>(b.lastPlayed||b.addedAt)-(a.lastPlayed||a.addedAt));
+  library.innerHTML="";
+  if(!roms.length){
+    library.innerHTML='<div class="empty">Noch keine GBA-ROM hinzugefügt.</div>';
+    return;
+  }
+
+  for(const rom of roms){
+    const save=await getOne(SAVE_STORE,rom.id);
+    const card=document.createElement("div");
+    card.className="game-card";
+
+    const info=document.createElement("div");
+    info.innerHTML='<div class="game-title"></div><div class="meta"></div>';
+    info.querySelector(".game-title").textContent=rom.name.replace(/\.gba$/i,"");
+    info.querySelector(".meta").textContent=((rom.blob.size/1024/1024).toFixed(2))+" MB · Save: "+(save?fmtDate(save.updatedAt):"noch keiner");
+
+    const buttons=document.createElement("div");
+    buttons.className="card-buttons";
+
+    const play=document.createElement("button");
+    play.className="primary";
+    play.textContent="Spielen";
+    play.onclick=()=>startGame(rom.id);
+
+    const remove=document.createElement("button");
+    remove.className="danger";
+    remove.textContent="Entfernen";
+    remove.onclick=async()=>{
+      if(!confirm('"'+rom.name+'" aus der lokalen Bibliothek entfernen?')) return;
+      await delOne(ROM_STORE,rom.id);
+      await renderLibrary();
+    };
+
+    buttons.append(play,remove);
+    card.append(info,buttons);
+    library.append(card);
+  }
+}
+
+romInput.addEventListener("change",async()=>{
+  const files=[...(romInput.files||[])];
+  for(const file of files){
+    if(!file.name.toLowerCase().endsWith(".gba")) continue;
+
+    const id=await hashFile(file);
+    const existing=await getOne(ROM_STORE,id);
+
+    await putOne(ROM_STORE,{
+      id,
+      name:file.name,
+      blob:file.slice(0,file.size,"application/octet-stream"),
+      addedAt:existing?.addedAt||Date.now(),
+      lastPlayed:existing?.lastPlayed||0
+    });
+  }
+  romInput.value="";
+  await renderLibrary();
+});
+
+function cleanEmulator(){
+  if(currentObjectUrl){
+    URL.revokeObjectURL(currentObjectUrl);
+    currentObjectUrl=null;
+  }
+  game.innerHTML="";
+  const loader=document.getElementById("ejs-loader");
+  if(loader) loader.remove();
+}
+
+async function updateSaveUI(){
+  if(!currentGame) return;
+  const save=await getOne(SAVE_STORE,currentGame.id);
+  if(save){
+    saveStatus.innerHTML='<span class="dot ok"></span>Lokale Sicherung: '+fmtDate(save.updatedAt);
+    downloadSaveBtn.disabled=false;
+  }else{
+    saveStatus.innerHTML='<span class="dot"></span>Noch kein Save erkannt';
+    downloadSaveBtn.disabled=true;
+  }
+}
+
+async function startGame(id){
+  const rom=await getOne(ROM_STORE,id);
+  if(!rom) return;
+
+  cleanEmulator();
+  currentGame=rom;
+  rom.lastPlayed=Date.now();
+  await putOne(ROM_STORE,rom);
+
+  currentObjectUrl=URL.createObjectURL(rom.blob);
+  gameTitle.textContent=rom.name.replace(/\.gba$/i,"");
+
+  const numericId=parseInt(rom.id.slice(0,8),16);
+
+  window.EJS_player="#game";
+  window.EJS_core="gba";
+  window.EJS_gameName=rom.id;
+  window.EJS_gameID=numericId;
+  window.EJS_gameUrl=currentObjectUrl;
+  window.EJS_pathtodata="https://cdn.emulatorjs.org/stable/data/";
+  window.EJS_startOnLoaded=true;
+  window.EJS_language="de-DE";
+  window.EJS_fixedSaveInterval=10000;
+
+  window.EJS_onSaveUpdate=async function(e){
+    try{
+      const bytes=e?.save instanceof Uint8Array ? e.save : new Uint8Array(e?.save||[]);
+      if(!bytes.length) return;
+      await putOne(SAVE_STORE,{
+        gameId:rom.id,
+        bytes:new Blob([bytes],{type:"application/octet-stream"}),
+        updatedAt:Date.now(),
+        hash:e?.hash||null
+      });
+      await updateSaveUI();
+    }catch(err){
+      console.error("Save backup failed",err);
+    }
+  };
+
+  libraryPanel.classList.add("hidden");
+  playerPanel.classList.remove("hidden");
+  await updateSaveUI();
+
+  const script=document.createElement("script");
+  script.id="ejs-loader";
+  script.src="https://cdn.emulatorjs.org/stable/data/loader.js";
+  script.async=true;
+  script.onerror=()=>alert("EmulatorJS konnte nicht geladen werden.");
+  document.body.appendChild(script);
+}
+
+backBtn.addEventListener("click",async()=>{
+  cleanEmulator();
+  currentGame=null;
+  playerPanel.classList.add("hidden");
+  libraryPanel.classList.remove("hidden");
+  await renderLibrary();
+});
+
+downloadSaveBtn.addEventListener("click",async()=>{
+  if(!currentGame) return;
+  const save=await getOne(SAVE_STORE,currentGame.id);
+  if(!save?.bytes) return;
+
+  const url=URL.createObjectURL(save.bytes);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=currentGame.name.replace(/\.gba$/i,"")+".sav";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+});
+
+renderLibrary();
+</script>
+</body>
+</html>
