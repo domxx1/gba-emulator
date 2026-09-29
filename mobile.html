@@ -40,7 +40,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.17 · MAX-Turbo</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.18 · Turbo-Performance</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -76,7 +76,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
  </div>
  <div class="speedTop">
   <button id="speedSlow" class="touchBtn speedBtn" data-speed="-1" aria-label="Langsamer" title="Langsamer">⏪</button>
-  <div class="speedValue"><div id="speedValue">1,0×</div><div id="speedActual" style="font-size:.62rem;color:var(--muted);margin-top:2px">real: --</div></div>
+  <div class="speedValue"><div id="speedValue">1,0×</div><div id="speedActual" style="font-size:.62rem;color:var(--muted);margin-top:2px">real: --</div><div id="turboStatus" style="font-size:.58rem;color:var(--muted);margin-top:1px">Turbo: aus</div></div>
   <button id="speedFast" class="touchBtn speedBtn" data-speed="1" aria-label="Schneller" title="Schneller">⏩</button>
  </div>
  <div class="controlMain">
@@ -129,7 +129,7 @@ const PROJECTS={
  smaragd:{key:"smaragd-plus",title:"Pokémon Smaragd Plus",repo:"domxx1/pokemon-smaragd-plus",branch:"feature/overworld-encounters",saveBranch:"cloud-saves",workflow:"Smaragd Plus Build",artifact:"smaragd-plus-test-build"},
  retronium:{key:"retronium",title:"Pokémon Retronium",repo:"domxx1/pokemon-retronium",branch:"feature/retro-platinum-restart",saveBranch:"cloud-saves",workflow:"Retronium Retro Platinum Base",artifact:"Pokemon-Retronium-Retro-Platinum-Basis"}
 };
-const $=id=>document.getElementById(id); let currentGame=null,romUrl=null,cloudTimer=null,speedMeterTimer=null;
+const $=id=>document.getElementById(id); let currentGame=null,romUrl=null,cloudTimer=null,speedMeterTimer=null,turboAudioState=null;
 const tokenInput=$("token"),ghStatus=$("ghStatus"),library=$("library"),libraryPanel=$("libraryPanel"),playerPanel=$("playerPanel"),game=$("game"),gameTitle=$("gameTitle"),saveStatus=$("saveStatus");
 const rememberToken=$("rememberToken");
 const storedToken=localStorage.getItem("ghTokenPersistent")||"";
@@ -366,7 +366,7 @@ async function loadStateNow(slot){
 async function updateSaveUI(){return}
 
 
-function cleanup(){clearInterval(speedMeterTimer);speedMeterTimer=null;if(romUrl)URL.revokeObjectURL(romUrl);romUrl=null;game.innerHTML="";document.getElementById("ejs-loader")?.remove()}
+function cleanup(){try{setTurboPerformance(false)}catch(e){}clearInterval(speedMeterTimer);speedMeterTimer=null;if(romUrl)URL.revokeObjectURL(romUrl);romUrl=null;game.innerHTML="";document.getElementById("ejs-loader")?.remove()}
 async function startGame(id){const r=await one(ROMS,id);if(!r)return;cleanup();currentGame=r;r.lastPlayed=Date.now();await put(ROMS,r);if(token())try{await syncFromCloud(false)}catch(e){console.warn(e)}
  romUrl=URL.createObjectURL(r.blob);gameTitle.textContent=r.name.replace(/\.gba$/i,"");libraryPanel.classList.add("hidden");playerPanel.classList.remove("hidden");await updateSaveUI();await updateStateUI();
  window.EJS_player="#game";window.EJS_core="gba";window.EJS_gameName=r.saveKey;window.EJS_gameID=parseInt((r.contentHash||r.id).slice(0,8),16)||12345;window.EJS_gameUrl=romUrl;window.EJS_pathtodata="https://cdn.emulatorjs.org/4.2.3/data/";window.EJS_startOnLoaded=true;window.EJS_language="de-DE";window.EJS_fixedSaveInterval=10000;
@@ -392,6 +392,31 @@ function updateSpeedUI(){
  $("speedSlow")?.classList.toggle("active",v<1);
  $("speedFast")?.classList.toggle("active",v>1);
 }
+function setTurboPerformance(enabled){
+ const ejs=window.EJS_emulator;
+ const gm=ejs?.gameManager;
+ if(!ejs||!gm)return;
+ try{
+  if(enabled){
+   if(!turboAudioState){
+    turboAudioState={volume:ejs.volume,muted:ejs.muted};
+   }
+   // Audio output is one of the few removable costs in the browser build.
+   ejs.muted=true;
+   if(typeof ejs.setVolume==="function")ejs.setVolume(0);
+   if(gm.functions?.setVSync)gm.functions.setVSync(0);
+   $("turboStatus").textContent="Turbo: an · Audio aus";
+  }else{
+   if(gm.functions?.setVSync)gm.functions.setVSync(1);
+   if(turboAudioState){
+    ejs.muted=turboAudioState.muted;
+    if(typeof ejs.setVolume==="function")ejs.setVolume(turboAudioState.muted?0:turboAudioState.volume);
+   }
+   turboAudioState=null;
+   $("turboStatus").textContent="Turbo: aus";
+  }
+ }catch(e){console.warn("Turbo-Performance-Modus",e)}
+}
 function syncSpeedMenuState(v){
  const ejs=window.EJS_emulator;
  if(!ejs)return;
@@ -414,6 +439,7 @@ function applyEmulatorSpeed(){
   gm.functions.toggleSlowMotion(0);
   ejs.isFastForward=false;
   ejs.isSlowMotion=false;
+  setTurboPerformance(v==="max"||v>1);
 
   if(v==="max"){
    // RetroArch uses ratio 0 for unlimited fast-forward.
@@ -428,11 +454,13 @@ function applyEmulatorSpeed(){
    ejs.isFastForward=true;
    gm.functions.toggleFastForward(1);
   }else if(v<1){
+   setTurboPerformance(false);
    if(gm.functions.setVSync)gm.functions.setVSync(1);
    gm.functions.setSlowMotionRatio(1/v);
    ejs.isSlowMotion=true;
    gm.functions.toggleSlowMotion(1);
   }else{
+   setTurboPerformance(false);
    if(gm.functions.setVSync)gm.functions.setVSync(1);
   }
   syncSpeedMenuState(v);
