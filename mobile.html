@@ -14,7 +14,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 .game-card{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.game-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.meta{font-size:.75rem;margin-top:3px}.hidden{display:none!important}
 #game{width:100%;aspect-ratio:3/2;background:#000;border-radius:12px;overflow:hidden;min-height:280px;touch-action:none;overscroll-behavior:contain;outline:none}#game canvas{max-width:100%!important;max-height:100%!important}
 .mobileControls{display:none;user-select:none;-webkit-user-select:none;touch-action:none;overscroll-behavior:contain;background:#111722;border:1px solid var(--line);border-radius:14px;padding:10px;margin:10px 0}
-.shoulderRow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px}.shoulderRow .touchBtn{height:42px;border-radius:12px}
+.shoulderRow{display:grid;grid-template-columns:.68fr 1fr 1fr .68fr;gap:8px;margin-bottom:8px}.shoulderRow .touchBtn{height:40px;border-radius:11px;padding:7px 8px}.shoulderRow .quickBtn{font-size:.72rem}.shoulderRow .quickLoad{background:#1d4f72;border-color:#286b97}.shoulderRow .quickSave{background:#3b2027;border-color:#70404b;color:#ffd9df}
 .controlMain{display:grid;grid-template-columns:1fr .72fr 1fr;align-items:center;gap:8px;min-height:170px}
 .dpad{width:164px;height:164px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:3px;margin:auto}
 .touchBtn{touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;background:#273244;border:1px solid #45536a;color:#fff;font-weight:900;box-shadow:inset 0 -3px 0 rgba(0,0,0,.25)}
@@ -23,7 +23,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 .dpad .touchBtn{padding:0;font-size:1.45rem;border-radius:8px}
 .centerControls{display:flex;flex-direction:column;align-items:center;gap:8px}.centerPair{display:flex;gap:7px}.miniTouch{padding:9px 12px;font-size:.72rem;border-radius:999px;min-width:70px}
 .abControls{position:relative;width:142px;height:146px;margin:auto;justify-self:center;transform:translateX(-12px)}.roundBtn{position:absolute;width:66px;height:66px;border-radius:50%;font-size:1.55rem;padding:0}.roundBtn.b{left:0;top:62px}.roundBtn.a{right:0;top:22px}
-.speedTop{display:flex;justify-content:center;align-items:center;gap:10px;height:72px;margin:-2px 0 0}.speedBtn{width:42px;height:66px;padding:5px 3px!important;font-size:.68rem!important;writing-mode:vertical-rl;transform:rotate(180deg);opacity:.9}.speedBtn.active{background:#31506b;border-color:#5b8db5}.speedValue{min-width:54px;text-align:center;font-size:.8rem;font-weight:900;color:var(--accent)}
+.speedTop{display:flex;justify-content:center;align-items:center;gap:10px;height:72px;margin:-2px 0 0}.speedBtn{width:42px;height:66px;padding:5px 3px!important;font-size:1.25rem!important;opacity:.9}.speedBtn.active{background:#31506b;border-color:#5b8db5}.speedValue{min-width:54px;text-align:center;font-size:.8rem;font-weight:900;color:var(--accent)}
 .bottomSystem{display:flex;justify-content:center;gap:10px;margin-top:7px}.bottomSystem .touchBtn{min-width:92px;font-size:.76rem;padding:9px 13px}
 .mobileControlHint{text-align:center;color:var(--muted);font-size:.68rem;margin-top:7px}
 .stateManager{margin:10px 0 12px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#111722}
@@ -40,7 +40,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.12 · Speed-Steuerung</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.13 · Quick Slot 1</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -70,12 +70,14 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 <div id="mobileControls" class="mobileControls" aria-label="Mobile GBA Steuerung">
  <div class="shoulderRow">
   <button class="touchBtn" data-input="10">L</button>
+  <button id="quickLoadBtn" class="touchBtn quickBtn quickLoad" title="Slot 1 laden">Quickload</button>
+  <button id="quickSaveBtn" class="touchBtn quickBtn quickSave" title="In Slot 1 speichern">Quicksave</button>
   <button class="touchBtn" data-input="11">R</button>
  </div>
  <div class="speedTop">
-  <button id="speedSlow" class="touchBtn speedBtn" data-speed="-1">Slow</button>
+  <button id="speedSlow" class="touchBtn speedBtn" data-speed="-1" aria-label="Langsamer" title="Langsamer">⏪</button>
   <div id="speedValue" class="speedValue">1,0×</div>
-  <button id="speedFast" class="touchBtn speedBtn" data-speed="1">Fast</button>
+  <button id="speedFast" class="touchBtn speedBtn" data-speed="1" aria-label="Schneller" title="Schneller">⏩</button>
  </div>
  <div class="controlMain">
   <div class="dpad">
@@ -313,12 +315,12 @@ async function updateStateUI(){
  $("stateStatus").innerHTML=any?'<span class="dot ok"></span>Save-State-Slots bereit':'<span class="dot"></span>Noch kein Save State';
 }
 
-async function saveStateNow(slot){
+async function saveStateNow(slot,confirmOverwrite=true){
  if(!currentGame)return;
  const gm=window.EJS_emulator?.gameManager;
  if(!gm)throw Error("Emulator ist noch nicht bereit.");
  const existing=await newestSlot(slot);
- if(existing&&!confirm("Slot "+slot+" enthält bereits einen Stand vom "+fmt(existing.updatedAt)+". Wirklich überschreiben?"))return;
+ if(confirmOverwrite&&existing&&!confirm("Slot "+slot+" enthält bereits einen Stand vom "+fmt(existing.updatedAt)+". Wirklich überschreiben?"))return;
  let data;
  try{data=gm.getState();}catch(e){throw Error("Save State konnte nicht erzeugt werden: "+e.message);}
  if(!data||!data.length)throw Error("Der Emulator hat keinen Save State zurückgegeben.");
@@ -373,6 +375,8 @@ async function startGame(id){const r=await one(ROMS,id);if(!r)return;cleanup();c
  const sc=document.createElement("script");sc.id="ejs-loader";sc.src="https://cdn.emulatorjs.org/4.2.3/data/loader.js";sc.async=true;sc.onerror=()=>alert("EmulatorJS konnte nicht geladen werden.");document.body.appendChild(sc)}
 document.querySelectorAll(".stateSaveSlot").forEach(b=>b.onclick=async()=>{try{await saveStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
 document.querySelectorAll(".stateLoadSlot").forEach(b=>b.onclick=async()=>{try{await loadStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
+$("quickLoadBtn").onclick=async()=>{try{await loadStateNow(1)}catch(e){alert(e.message)}};
+$("quickSaveBtn").onclick=async()=>{try{await saveStateNow(1,false)}catch(e){alert(e.message)}};
 $("backBtn").onclick=async()=>{cleanup();currentGame=null;playerPanel.classList.add("hidden");libraryPanel.classList.remove("hidden");render()};
 
 const SPEED_STEPS=[0.5,0.67,0.8,1,1.25,1.5,2,3,4];
