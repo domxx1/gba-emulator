@@ -54,7 +54,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 <section id="libraryPanel" class="panel">
 <h2>Unsere aktuellen Builds</h2>
 <div class="projects">
- <div class="card"><strong>Pokémon Smaragd Plus</strong><div class="meta">feature/overworld-encounters · Test-GBA aus Drive auswählen</div><div class="actions"><a class="file" href="https://drive.google.com/drive/folders/1Mgl_f3NZuXKzYCkYfuj4zGo9ja2_Gb0l" target="_blank" rel="noopener">Drive-Testbuilds</a><label class="file primary">GBA importieren<input class="projectRomInput" data-project="smaragd" type="file" multiple></label><button class="projectBtn" data-project="smaragd">GitHub-Build laden</button></div><div id="smaragdStatus" class="status">GBA aus Drive herunterladen und hier importieren. Ältere Testbuilds bleiben auswählbar.</div></div>
+ <div class="card"><strong>Pokémon Smaragd Plus</strong><div class="meta">feature/overworld-encounters · Test-GBA aus Drive auswählen</div><div class="actions"><a class="file" href="https://drive.google.com/drive/folders/1Mgl_f3NZuXKzYCkYfuj4zGo9ja2_Gb0l" target="_blank" rel="noopener">Drive-Testbuilds</a><label class="file primary">GBA importieren<input class="projectRomInput" data-project="smaragd" type="file" multiple></label><button class="projectBtn" data-project="smaragd">GitHub-Build laden</button></div><div class="actions"><label class="file">Basis-ROM einmal hinterlegen<input id="smaragdBaseInput" type="file" accept=".gba"></label><label class="file">Patch importieren<input id="smaragdPatchInput" type="file" accept=".ips32"></label><button id="smaragdPatchRefresh">GitHub-Patches anzeigen</button></div><div id="smaragdPatchList" class="library"></div><div id="smaragdStatus" class="status">GBA aus Drive herunterladen und hier importieren. Ältere Testbuilds bleiben auswählbar.</div></div>
  <div class="card"><strong>Pokémon Retronium</strong><div class="meta">feature/retro-platinum-restart · Test-GBA importieren</div><div class="actions"><label class="file primary">GBA importieren<input class="projectRomInput" data-project="retronium" type="file" multiple></label><button class="projectBtn" data-project="retronium">GitHub-Build laden</button></div><div id="retroniumStatus" class="status"></div></div>
 </div>
 <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
@@ -228,6 +228,75 @@ async function loadProject(id){
  }catch(e){console.error(e);st.textContent="Fehler: "+e.message}
 }
 document.querySelectorAll(".projectBtn").forEach(b=>b.onclick=()=>loadProject(b.dataset.project));
+
+ // IPS32 patches are applied to an exact local base ROM. The base never leaves this device.
+ const PATCH_INDEX="smaragd-patches.json", BASE_ID="smaragd-plus:base";
+ async function importBase(file){
+  if(!/\.gba$/i.test(file.name))throw Error("Bitte eine .gba-Datei als Basis wählen.");
+  const hash=await sha256(file);
+  await put(ROMS,{id:BASE_ID,saveKey:PROJECTS.smaragd.key,name:file.name,blob:file.slice(0,file.size),source:"base",contentHash:hash,addedAt:Date.now()});
+  $("smaragdStatus").textContent="Basis-ROM gespeichert · SHA-256 "+hash.slice(0,12)+".";
+  await render();
+ }
+ function applyIps32(base,patch){
+  const p=new Uint8Array(patch),b=new Uint8Array(base),header="IPS32";
+  if(p.length<9||!header.split("").every((v,i)=>p[i]===v.charCodeAt(0)))throw Error("Ungültiger IPS32-Patch.");
+  const out=new Uint8Array(b);let i=5,ended=false;
+  const read32=()=>{if(i+4>p.length)throw Error("Patch abgeschnitten.");const n=(p[i]*0x1000000)+(p[i+1]<<16)+(p[i+2]<<8)+p[i+3];i+=4;return n>>>0};
+  while(i<p.length){
+   if(i+4<=p.length&&p[i]===69&&p[i+1]===69&&p[i+2]===79&&p[i+3]===70){i+=4;ended=true;break}
+   const off=read32();if(i+2>p.length)throw Error("Patch abgeschnitten.");
+   const size=(p[i++]<<8)|p[i++];let count=size,value=null;
+   if(!size){if(i+3>p.length)throw Error("Patch abgeschnitten.");count=(p[i++]<<8)|p[i++];value=p[i++];if(!count)throw Error("Leerer RLE-Eintrag.");}
+   if(off+count>out.length||i+(size||0)>p.length)throw Error("Patch passt nicht zur Größe der Basis-ROM.");
+   if(value===null){out.set(p.subarray(i,i+size),off);i+=size}else out.fill(value,off,off+count);
+  }
+  if(!ended||i!==p.length)throw Error("Patch-Ende ungültig.");
+  return out;
+ }
+ async function installPatch(patch,meta){
+  const base=await one(ROMS,BASE_ID);if(!base?.blob)throw Error("Bitte zuerst die passende Basis-ROM hinterlegen.");
+  if(!meta?.baseSha256||!meta?.resultSha256||!meta?.name)throw Error("Patch-Metadaten mit Basis- und Ergebnis-Prüfsumme fehlen.");
+  if(base.contentHash.toLowerCase()!==meta.baseSha256.toLowerCase())throw Error("Falsche Basis-ROM: SHA-256 stimmt nicht überein.");
+  if(meta.patchSha256&&(await sha256(patch)).toLowerCase()!==meta.patchSha256.toLowerCase())throw Error("Patch-Prüfsumme stimmt nicht.");
+  const result=new Blob([applyIps32(await base.blob.arrayBuffer(),await patch.arrayBuffer())],{type:"application/octet-stream"});
+  const hash=await sha256(result);if(hash.toLowerCase()!==meta.resultSha256.toLowerCase())throw Error("Ergebnis-Prüfsumme stimmt nicht; ROM wurde nicht gespeichert.");
+  const id=PROJECTS.smaragd.key+":"+hash,old=await one(ROMS,id);
+  await put(ROMS,{id,saveKey:PROJECTS.smaragd.key,name:meta.name.replace(/\.ips32$/i,"")+".gba",blob:result,source:"patch",repo:PROJECTS.smaragd.repo,sha:meta.commit||null,contentHash:hash,addedAt:old?.addedAt||Date.now(),lastPlayed:old?.lastPlayed||0});
+  // Preserve the shared in-game save before playing a new build.
+  const save=await one(SAVES,PROJECTS.smaragd.key);
+  if(save?.bytes)await put(SAVES,{...save,key:PROJECTS.smaragd.key+":backup:"+hash,backupAt:Date.now()});
+  await render();$("smaragdStatus").textContent="Patch installiert: "+meta.name+" · Spielstand gesichert.";return id;
+ }
+ $("smaragdBaseInput").onchange=async e=>{try{if(e.target.files[0])await importBase(e.target.files[0])}catch(err){$("smaragdStatus").textContent=err.message}finally{e.target.value=""}};
+ $("smaragdPatchInput").onchange=async e=>{try{
+  const f=e.target.files[0];if(!f)return;
+  const metaFile=prompt("Patch-Metadaten: JSON mit name, baseSha256 und resultSha256 einfügen");
+  if(!metaFile)return;
+  await installPatch(f,JSON.parse(metaFile));
+ }catch(err){$("smaragdStatus").textContent="Fehler: "+err.message}finally{e.target.value=""}};
+ async function showPatches(){
+  const list=$("smaragdPatchList");list.textContent="Lade Patchliste…";
+  try{
+   const response=await fetch(PATCH_INDEX,{cache:"no-store"});if(!response.ok)throw Error("Noch keine Patchliste veröffentlicht.");
+   const entries=await response.json();if(!Array.isArray(entries))throw Error("Patchliste ungültig.");
+   list.textContent="";
+   if(!entries.length){list.textContent="Noch keine Patches veröffentlicht.";return}
+   for(const m of entries){
+    const row=document.createElement("div");row.className="game-card";
+    const name=document.createElement("strong");name.textContent=m.name||"Patch";
+    const button=document.createElement("button");button.textContent="Laden und spielen";
+    button.onclick=async()=>{button.disabled=true;try{
+     const url=new URL(m.url,location.href);
+     if(url.protocol!=="https:"||!["github.com","api.github.com","objects.githubusercontent.com","release-assets.githubusercontent.com",location.hostname].includes(url.hostname))throw Error("Patch-URL nicht erlaubt.");
+     const response=await fetch(url);if(!response.ok)throw Error("Download fehlgeschlagen: "+response.status);
+     const id=await installPatch(await response.blob(),m);await startGame(id);
+    }catch(err){$("smaragdStatus").textContent="Fehler: "+err.message}finally{button.disabled=false}};
+    row.append(name,button);list.append(row);
+   }
+  }catch(e){list.textContent=e.message}
+ }
+ $("smaragdPatchRefresh").onclick=showPatches;
  document.querySelectorAll(".projectRomInput").forEach(input=>input.onchange=async e=>{const p=PROJECTS[input.dataset.project],files=[...e.target.files].filter(f=>/\.gba$/i.test(f.name)),st=$(input.dataset.project+"Status");try{if(!files.length)throw Error("Bitte eine .gba-Datei wählen.");for(const f of files){const hash=await sha256(f),id=p.key+":"+hash;const old=await one(ROMS,id);await put(ROMS,{id,saveKey:p.key,name:f.name,blob:f.slice(0,f.size,"application/octet-stream"),source:"manual",repo:p.repo,branch:p.branch,contentHash:hash,addedAt:old?.addedAt||Date.now(),lastPlayed:old?.lastPlayed||0})}st.textContent=files.length+" Testbuild(s) importiert. Ältere Versionen bleiben in der Bibliothek.";await render();}catch(err){st.textContent="Fehler: "+err.message}finally{input.value=""}});
 
 $("romInput").onchange=async e=>{for(const f of [...e.target.files]){if(!/\.gba$/i.test(f.name))continue;const id=await sha256(f),old=await one(ROMS,id);await put(ROMS,{id,saveKey:id,name:f.name,blob:f.slice(0,f.size,"application/octet-stream"),source:"local",addedAt:old?.addedAt||Date.now(),lastPlayed:old?.lastPlayed||0})}e.target.value="";render()};
