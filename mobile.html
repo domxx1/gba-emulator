@@ -40,7 +40,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.13 · Quick Slot 1</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.14 · Speed 10x</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -379,7 +379,7 @@ $("quickLoadBtn").onclick=async()=>{try{await loadStateNow(1)}catch(e){alert(e.m
 $("quickSaveBtn").onclick=async()=>{try{await saveStateNow(1,false)}catch(e){alert(e.message)}};
 $("backBtn").onclick=async()=>{cleanup();currentGame=null;playerPanel.classList.add("hidden");libraryPanel.classList.remove("hidden");render()};
 
-const SPEED_STEPS=[0.5,0.67,0.8,1,1.25,1.5,2,3,4];
+const SPEED_STEPS=[0.5,0.67,0.8,1,1.25,1.5,2,3,4,5,6,8,10];
 let speedIndex=3;
 
 function speedText(v){
