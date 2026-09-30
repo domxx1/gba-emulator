@@ -120,7 +120,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </div>
 </section>
 
-<section class="panel"><h2>Speicherstände</h2><div class="note"><b>Save States sind die primäre Speicherart.</b> Es gibt drei getrennte Slots. Jeder Slot wird lokal und bei GitHub-Verbindung zusätzlich im privaten <code>cloud-saves</code>-Branch des jeweiligen Spiele-Repositories gespeichert. Laden und Speichern sind bewusst getrennt; beim Überschreiben eines belegten Slots wird nachgefragt. Normale Pokémon-Ingame-Saves laufen nur noch automatisch im Hintergrund.</div></section>
+<section class="panel"><h2>Speicherstände</h2><div class="note"><b>Für Patchwechsel im Spiel selbst speichern.</b> Dieser Spielstand wird automatisch übernommen und bei GitHub-Verbindung zusätzlich im privaten <code>cloud-saves</code>-Branch des Spiele-Repositories gesichert. QuickSave und die drei Save-State-Slots gehören jeweils zur aktuellen Spielversion; sie bleiben für diese Version erhalten. Nach dem Speichern im Spiel bis zur Anzeige „Spielstand gesichert“ warten.</div></section>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
@@ -129,7 +129,7 @@ const PROJECTS={
  smaragd:{key:"smaragd-plus",title:"Pokémon Smaragd Plus",repo:"domxx1/pokemon-smaragd-plus",branch:"feature/overworld-encounters",saveBranch:"cloud-saves",workflow:"Smaragd Plus Build",artifact:"smaragd-plus-test-build"},
  retronium:{key:"retronium",title:"Pokémon Retronium",repo:"domxx1/pokemon-retronium",branch:"feature/retro-platinum-restart",saveBranch:"cloud-saves",workflow:"Retronium Retro Platinum Base",artifact:"Pokemon-Retronium-Retro-Platinum-Basis"}
 };
-const $=id=>document.getElementById(id); let currentGame=null,romUrl=null,cloudTimer=null,speedMeterTimer=null,turboAudioState=null,turboResumeTimer=null;
+const $=id=>document.getElementById(id); let currentGame=null,romUrl=null,cloudTimer=null,speedMeterTimer=null,turboAudioState=null,turboResumeTimer=null,saveInterval=null,saveReady=false,saveWriteQueue=Promise.resolve(),cloudWriteQueue=Promise.resolve();
 const tokenInput=$("token"),ghStatus=$("ghStatus"),library=$("library"),libraryPanel=$("libraryPanel"),playerPanel=$("playerPanel"),game=$("game"),gameTitle=$("gameTitle"),saveStatus=$("saveStatus");
 const rememberToken=$("rememberToken");
 const storedToken=localStorage.getItem("ghTokenPersistent")||"";
@@ -340,10 +340,14 @@ async function cloudGet(key){
  if(!r)return null;
  return {...r.data,sha:r.sha};
 }
-async function cloudPut(key,save){
- if(!currentGame||!token())return;
- const payload={key,updatedAt:save.updatedAt,buildSha:currentGame.sha||null,save:b64(new Uint8Array(await save.bytes.arrayBuffer()))};
- await cloudJsonPut(currentGame,"emulator-saves/ingame-save.json",payload,"Sync GBA ingame save");
+async function cloudPut(entry,save){
+ if(!entry||!token())return;
+ const payload={key:entry.saveKey,updatedAt:save.updatedAt,buildSha:entry.sha||null,save:b64(new Uint8Array(await save.bytes.arrayBuffer()))};
+ await cloudJsonPut(entry,"emulator-saves/ingame-save.json",payload,"Sync GBA ingame save");
+}
+function queueCloud(entry,save){
+ cloudWriteQueue=cloudWriteQueue.then(()=>cloudPut(entry,save)).catch(e=>console.warn("Cloud-Spielstand konnte nicht gespeichert werden",e));
+ return cloudWriteQueue;
 }
 async function syncFromCloud(force=false){
  if(!currentGame||!token())return false;
@@ -357,19 +361,63 @@ async function syncFromCloud(force=false){
  }
  return false;
 }
-async function injectLocalSave(){const s=await one(SAVES,currentGame.saveKey);if(!s?.bytes||!window.EJS_emulator?.gameManager)return;const gm=window.EJS_emulator.gameManager,bytes=new Uint8Array(await s.bytes.arrayBuffer());try{gm.FS.writeFile(gm.getSaveFilePath(),bytes);gm.loadSaveFiles();if(saveStatus)saveStatus.innerHTML='<span class="dot ok"></span>Save geladen: '+fmt(s.updatedAt)}catch(e){console.warn("Save konnte nicht injiziert werden",e)}}
-function stateKey(slot){return currentGame.saveKey+":slot"+slot}
-function statePath(slot){return "emulator-saves/save-state-slot-"+slot+".json"}
+function usableSave(bytes){
+ if(!bytes||bytes.length<512||bytes.length>1024*1024)return false;
+ return bytes.some(v=>v!==0&&v!==255);
+}
+async function persistSave(bytes,entry){
+ if(!usableSave(bytes))return;
+ const blob=new Blob([bytes]),hash=await sha256(blob),old=await one(SAVES,entry.saveKey);
+ if(old?.hash===hash)return;
+ const s={key:entry.saveKey,bytes:blob,updatedAt:Date.now(),hash,buildSha:entry.sha||null};
+ await put(SAVES,s);
+ if(currentGame===entry){
+  saveStatus.innerHTML='<span class="dot ok"></span>Spielstand gesichert: '+fmt(s.updatedAt);
+  clearTimeout(cloudTimer);
+  if(token())cloudTimer=setTimeout(()=>queueCloud(entry,s),1800);
+ }
+}
+function queueSave(bytes,entry){
+ const copy=bytes instanceof Uint8Array?new Uint8Array(bytes):new Uint8Array(bytes||[]);
+ saveWriteQueue=saveWriteQueue.then(()=>persistSave(copy,entry)).catch(e=>console.error("Spielstand konnte nicht gespeichert werden",e));
+ return saveWriteQueue;
+}
+async function injectLocalSave(entry){
+ const gm=window.EJS_emulator?.gameManager;if(!gm||currentGame!==entry)return;
+ const s=await one(SAVES,entry.saveKey);
+ if(currentGame!==entry)return;
+ if(s?.bytes){
+  const bytes=new Uint8Array(await s.bytes.arrayBuffer());
+  if(currentGame!==entry)return;
+  if(!usableSave(bytes))throw Error("Gespeicherter Spielstand ist leer oder beschädigt.");
+  gm.FS.writeFile(gm.getSaveFilePath(),bytes);
+  gm.loadSaveFiles();
+  saveStatus.innerHTML='<span class="dot ok"></span>Spielstand übernommen: '+fmt(s.updatedAt);
+ }else{
+  // Read a save stored internally by EmulatorJS before this app captured saves.
+  const previous=gm.getSaveFile(false);
+  if(usableSave(previous))await queueSave(previous,entry);
+ }
+ if(currentGame===entry)saveReady=true;
+}
+function stateBuild(){return currentGame.contentHash||currentGame.sha||currentGame.id}
+function stateKey(slot){return currentGame.saveKey+":build:"+stateBuild()+":slot"+slot}
+function statePath(slot){return "emulator-saves/build-"+stateBuild()+"/save-state-slot-"+slot+".json"}
+function matchingState(st){return !!st&&(st.contentHash?st.contentHash===currentGame.contentHash:!!st.buildSha&&st.buildSha===currentGame.sha)}
 
 async function getLocalSlot(slot){
  let st=await one(STATES,stateKey(slot));
- // Migration: previous single local state becomes Slot 1.
+ // Migrate only a state whose recorded ROM matches this build.
  if(!st&&slot===1){
    const legacy=await one(STATES,currentGame.saveKey);
-   if(legacy){
+   if(matchingState(legacy)){
      st={...legacy,key:stateKey(1)};
      await put(STATES,st);
    }
+ }
+ if(!st){
+   const legacy=await one(STATES,currentGame.saveKey+":slot"+slot);
+   if(matchingState(legacy)){st={...legacy,key:stateKey(slot)};await put(STATES,st)}
  }
  return st;
 }
@@ -377,8 +425,14 @@ async function getLocalSlot(slot){
 async function getCloudSlot(slot){
  if(!token()||!projectForGame(currentGame))return null;
  let r=await cloudJsonGet(currentGame,statePath(slot));
- // Migration: previous single cloud state becomes Slot 1.
- if(!r&&slot===1)r=await cloudJsonGet(currentGame,"emulator-saves/save-state.json");
+ if(!r){
+   const legacy=await cloudJsonGet(currentGame,"emulator-saves/save-state-slot-"+slot+".json");
+   if(legacy&&matchingState(legacy.data))r=legacy;
+ }
+ if(!r&&slot===1){
+   const legacy=await cloudJsonGet(currentGame,"emulator-saves/save-state.json");
+   if(legacy&&matchingState(legacy.data))r=legacy;
+ }
  if(!r?.data?.state)return null;
  return {
    key:stateKey(slot),
@@ -453,25 +507,36 @@ async function loadStateNow(slot){
  if(!gm)throw Error("Emulator ist noch nicht bereit.");
  const st=await newestSlot(slot);
  if(!st?.bytes)throw Error("Slot "+slot+" ist leer.");
- if((st.contentHash&&currentGame.contentHash&&st.contentHash!==currentGame.contentHash)||(!st.contentHash&&st.buildSha&&currentGame.sha&&st.buildSha!==currentGame.sha)){
-   const ok=confirm("Slot "+slot+" stammt aus einem anderen ROM-Build. Save States können zwischen Versionen inkompatibel sein. Trotzdem laden?");
-   if(!ok)return;
- }
+ if(!matchingState(st))throw Error("Dieser Save State gehört zu einer anderen Spielversion. Starte diese Version oder lade den spielinternen Speicherstand.");
  const bytes=new Uint8Array(await st.bytes.arrayBuffer());
  try{gm.loadState(bytes);}catch(e){throw Error("Save State konnte nicht geladen werden: "+e.message);}
  $("stateStatus").innerHTML='<span class="dot ok"></span>Slot '+slot+" geladen: "+fmt(st.updatedAt);
  await updateStateUI();
 }
-async function updateSaveUI(){return}
+async function updateSaveUI(){
+ if(!currentGame)return;
+ const entry=currentGame,s=await one(SAVES,entry.saveKey);
+ if(currentGame===entry)saveStatus.innerHTML=s?.bytes?'<span class="dot ok"></span>Spielstand bereit: '+fmt(s.updatedAt):'<span class="dot"></span>Noch kein spielinterner Speicherstand';
+}
 
 
 async function cleanup(waitForAbort=false){
  const old=window.EJS_emulator;
  try{setTurboPerformance(false)}catch(e){}
  clearInterval(speedMeterTimer);speedMeterTimer=null;clearTimeout(turboResumeTimer);turboResumeTimer=null;
+ clearInterval(saveInterval);saveInterval=null;
  clearTimeout(cloudTimer);cloudTimer=null;
 
  if(old){
+  if(saveReady&&currentGame){
+   try{
+    old.gameManager?.saveSaveFiles();await saveWriteQueue;
+    clearTimeout(cloudTimer);cloudTimer=null;
+    const finalSave=await one(SAVES,currentGame.saveKey);
+    if(token()&&finalSave?.bytes)await queueCloud(currentGame,finalSave);
+   }catch(e){console.warn("Spielstand beim Wechsel",e)}
+  }
+  saveReady=false;
   try{
    // Stop EmulatorJS' periodic save timer first.
    if(typeof old.startSaveInterval==="function")old.startSaveInterval(0);
@@ -497,9 +562,17 @@ async function cleanup(waitForAbort=false){
 }
 async function startGame(id){const r=await one(ROMS,id);if(!r)return;await cleanup(true);currentGame=r;r.lastPlayed=Date.now();await put(ROMS,r);if(token())try{await syncFromCloud(false)}catch(e){console.warn(e)}
  romUrl=URL.createObjectURL(r.blob);gameTitle.textContent=r.name.replace(/\.gba$/i,"");libraryPanel.classList.add("hidden");playerPanel.classList.remove("hidden");await updateSaveUI();await updateStateUI();
- window.EJS_player="#game";window.EJS_core="gba";window.EJS_gameName=r.saveKey;window.EJS_gameID=parseInt((r.contentHash||r.id).slice(0,8),16)||12345;window.EJS_gameUrl=romUrl;window.EJS_pathtodata="https://cdn.emulatorjs.org/4.2.3/data/";window.EJS_startOnLoaded=true;window.EJS_language="de-DE";window.EJS_fixedSaveInterval=10000;
- window.EJS_onGameStart=()=>setTimeout(()=>{speedIndex=2;applyEmulatorSpeed(false);startSpeedMeter();injectLocalSave();game.focus({preventScroll:true})},900);
- window.EJS_onSaveUpdate=async e=>{try{const bytes=e?.save instanceof Uint8Array?e.save:new Uint8Array(e?.save||[]);if(!bytes.length)return;const s={key:r.saveKey,bytes:new Blob([bytes]),updatedAt:Date.now(),hash:e?.hash||null};await put(SAVES,s);await updateSaveUI();clearTimeout(cloudTimer);if(token())cloudTimer=setTimeout(()=>cloudPut(r.saveKey,s).catch(console.error),1800)}catch(err){console.error(err)}};
+ window.EJS_player="#game";window.EJS_core="gba";window.EJS_gameName=r.saveKey;window.EJS_gameID=parseInt((r.contentHash||r.id).slice(0,8),16)||12345;window.EJS_gameUrl=romUrl;window.EJS_pathtodata="https://cdn.emulatorjs.org/4.2.3/data/";window.EJS_startOnLoaded=true;window.EJS_language="de-DE";
+ window.EJS_onGameStart=()=>{
+  const ejs=window.EJS_emulator,gm=ejs?.gameManager;if(!gm)return;
+  // EmulatorJS 4.2.3 emits saveSaveFiles; EJS_onSaveUpdate is not wired there.
+  ejs.on("saveSaveFiles",bytes=>{if(saveReady&&currentGame===r)queueSave(bytes,r)});
+  injectLocalSave(r).then(()=>{
+   if(currentGame!==r)return;
+   saveInterval=setInterval(()=>{if(saveReady&&currentGame===r)gm.saveSaveFiles()},10000);
+  }).catch(err=>{saveStatus.textContent="Spielstand konnte nicht übernommen werden: "+err.message;console.error(err)});
+  setTimeout(()=>{if(currentGame!==r)return;speedIndex=2;applyEmulatorSpeed(false);startSpeedMeter();game.focus({preventScroll:true})},900);
+ };
  const sc=document.createElement("script");sc.id="ejs-loader";sc.src="https://cdn.emulatorjs.org/4.2.3/data/loader.js";sc.async=true;sc.onerror=()=>alert("EmulatorJS konnte nicht geladen werden.");document.body.appendChild(sc)}
 document.querySelectorAll(".stateSaveSlot").forEach(b=>b.onclick=async()=>{try{await saveStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
 document.querySelectorAll(".stateLoadSlot").forEach(b=>b.onclick=async()=>{try{await loadStateNow(Number(b.dataset.slot))}catch(e){alert(e.message)}});
