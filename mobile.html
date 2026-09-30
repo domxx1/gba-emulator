@@ -40,7 +40,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </style>
 </head>
 <body><div class="wrap">
-<header><h1>GBA Cloud</h1><span class="badge">v0.20 · Turbo-Resume</span></header>
+<header><h1>GBA Cloud</h1><span class="badge">v0.22 · Speicherübernahme</span></header>
 
 <section class="panel">
 <h2>GitHub-Verbindung</h2>
@@ -100,6 +100,9 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
  <div class="mobileControlHint">Touch-Steuerung · Geschwindigkeit per Tippen einstellen</div>
 </div>
 
+<div class="savebar" role="status" aria-live="polite">
+<div id="saveStatus" class="save-status"><span class="dot"></span>Noch kein spielinterner Speicherstand</div>
+</div>
 <div class="stateManager">
 <div id="stateStatus" class="save-status"><span class="dot"></span>Noch kein Save State</div>
 <div class="stateDivider"></div>
@@ -120,7 +123,7 @@ input[type=password]{width:100%;padding:11px;background:#0f1520;border:1px solid
 </div>
 </section>
 
-<section class="panel"><h2>Speicherstände</h2><div class="note"><b>Für Patchwechsel im Spiel selbst speichern.</b> Dieser Spielstand wird automatisch übernommen und bei GitHub-Verbindung zusätzlich im privaten <code>cloud-saves</code>-Branch des Spiele-Repositories gesichert. QuickSave und die drei Save-State-Slots gehören jeweils zur aktuellen Spielversion; sie bleiben für diese Version erhalten. Nach dem Speichern im Spiel bis zur Anzeige „Spielstand gesichert“ warten.</div></section>
+<section class="panel"><h2>Speicherstände</h2><div class="note"><b>Für Patchwechsel im Spiel selbst speichern.</b> Dieser Spielstand wird automatisch übernommen und bei GitHub-Verbindung zusätzlich im privaten <code>cloud-saves</code>-Branch des Spiele-Repositories gesichert. QuickSave und die drei Save-State-Slots gehören jeweils zur aktuellen Spielversion; sie bleiben für diese Version erhalten. Nach dem Speichern im Spiel bis zur Anzeige „Spielstand gesichert“ warten.</div><div class="actions" style="margin-top:10px"><button id="recoverCloudState">Alten Smaragd-Cloud-QuickSave öffnen</button></div><div id="recoveryStatus" class="status"></div></section>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
@@ -364,12 +367,46 @@ async function cloudGet(key){
 async function cloudPut(entry,save){
  if(!entry||!token())return;
  const payload={key:entry.saveKey,updatedAt:save.updatedAt,buildSha:entry.sha||null,save:b64(new Uint8Array(await save.bytes.arrayBuffer()))};
- await cloudJsonPut(entry,"emulator-saves/ingame-save.json",payload,"Sync GBA ingame save");
+ return cloudJsonPut(entry,"emulator-saves/ingame-save.json",payload,"Sync GBA ingame save");
 }
 function queueCloud(entry,save){
- cloudWriteQueue=cloudWriteQueue.then(()=>cloudPut(entry,save)).catch(e=>console.warn("Cloud-Spielstand konnte nicht gespeichert werden",e));
+ cloudWriteQueue=cloudWriteQueue.then(()=>cloudPut(entry,save)).then(synced=>{
+  if(synced&&currentGame===entry)saveStatus.innerHTML='<span class="dot ok"></span>Spielstand lokal + Cloud gesichert: '+fmt(save.updatedAt);
+ }).catch(e=>{
+  if(currentGame===entry)saveStatus.textContent="Spielstand lokal gesichert · Cloud-Fehler: "+e.message;
+  console.warn("Cloud-Spielstand konnte nicht gespeichert werden",e);
+ });
  return cloudWriteQueue;
 }
+async function recoverCloudState(){
+ if(!token())throw Error("Bitte zuerst mit GitHub verbinden.");
+ const p=PROJECTS.smaragd,entry={repo:p.repo,saveKey:p.key};
+ const candidates=await Promise.all([
+  cloudJsonGet(entry,"emulator-saves/save-state-slot-1.json"),
+  cloudJsonGet(entry,"emulator-saves/save-state.json")
+ ]);
+ const saved=candidates.filter(c=>c?.data?.state).map(c=>c.data).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0];
+ if(!saved)throw Error("Kein alter Cloud-QuickSave vorhanden.");
+ if(!saved.contentHash&&!saved.buildSha)throw Error("Beim alten QuickSave fehlt die Spielversion. Eine sichere Zuordnung ist nicht möglich.");
+ let rom=(await all(ROMS)).find(r=>r.source!=="base"&&r.saveKey===p.key&&(saved.contentHash?r.contentHash===saved.contentHash:r.sha===saved.buildSha));
+ if(!rom){
+  $("recoveryStatus").textContent="Suche den passenden Patch für den alten QuickSave…";
+  const patches=JSON.parse(new TextDecoder().decode(await patchRepoFile(PATCH_INDEX)));
+  if(!Array.isArray(patches))throw Error("Patchliste ungültig.");
+  const patch=patches.find(m=>saved.contentHash?m.resultSha256===saved.contentHash:m.commit===saved.buildSha);
+  if(!patch)throw Error("Die Spielversion dieses QuickSaves ist nicht in der Bibliothek oder Patchliste vorhanden. Bitte die ursprüngliche Version importieren.");
+  $("recoveryStatus").textContent="Lade die passende Spielversion: "+patch.name;
+  rom=await one(ROMS,await installPatch(await downloadPrivatePatch(patch),patch));
+ }
+ const state={bytes:new Blob([unb64(saved.state)]),updatedAt:saved.updatedAt,contentHash:saved.contentHash||null,buildSha:saved.buildSha||null};
+ $("recoveryStatus").textContent="Starte "+rom.name+" und lade den zugehörigen Cloud-QuickSave…";
+ await startGame(rom.id,state);
+}
+$("recoverCloudState").onclick=async()=>{
+ const button=$("recoverCloudState");button.disabled=true;
+ try{await recoverCloudState()}catch(e){$("recoveryStatus").textContent="Wiederherstellung: "+e.message}
+ finally{button.disabled=false}
+};
 async function syncFromCloud(force=false){
  if(!currentGame||!token())return false;
  const c=await cloudGet(currentGame.saveKey);
@@ -527,7 +564,7 @@ async function loadStateNow(slot){
  const gm=window.EJS_emulator?.gameManager;
  if(!gm)throw Error("Emulator ist noch nicht bereit.");
  const st=await newestSlot(slot);
- if(!st?.bytes)throw Error("Slot "+slot+" ist leer.");
+ if(!st?.bytes)throw Error("Slot "+slot+" ist für diese Spielversion leer. Alte Cloud-QuickSaves unten über „Alten Smaragd-Cloud-QuickSave öffnen“ mit der passenden Version laden.");
  if(!matchingState(st))throw Error("Dieser Save State gehört zu einer anderen Spielversion. Starte diese Version oder lade den spielinternen Speicherstand.");
  const bytes=new Uint8Array(await st.bytes.arrayBuffer());
  try{gm.loadState(bytes);}catch(e){throw Error("Save State konnte nicht geladen werden: "+e.message);}
@@ -581,17 +618,24 @@ async function cleanup(waitForAbort=false){
  game.innerHTML="";
  document.getElementById("ejs-loader")?.remove();
 }
-async function startGame(id){const r=await one(ROMS,id);if(!r)return;await cleanup(true);currentGame=r;r.lastPlayed=Date.now();await put(ROMS,r);if(token())try{await syncFromCloud(false)}catch(e){console.warn(e)}
+async function startGame(id,restoreState=null){const r=await one(ROMS,id);if(!r)return;await cleanup(true);currentGame=r;r.lastPlayed=Date.now();await put(ROMS,r);if(token())try{await syncFromCloud(false)}catch(e){console.warn(e)}
  romUrl=URL.createObjectURL(r.blob);gameTitle.textContent=r.name.replace(/\.gba$/i,"");libraryPanel.classList.add("hidden");playerPanel.classList.remove("hidden");await updateSaveUI();await updateStateUI();
  window.EJS_player="#game";window.EJS_core="gba";window.EJS_gameName=r.saveKey;window.EJS_gameID=parseInt((r.contentHash||r.id).slice(0,8),16)||12345;window.EJS_gameUrl=romUrl;window.EJS_pathtodata="https://cdn.emulatorjs.org/4.2.3/data/";window.EJS_startOnLoaded=true;window.EJS_language="de-DE";
  window.EJS_onGameStart=()=>{
   const ejs=window.EJS_emulator,gm=ejs?.gameManager;if(!gm)return;
   // EmulatorJS 4.2.3 emits saveSaveFiles; EJS_onSaveUpdate is not wired there.
   ejs.on("saveSaveFiles",bytes=>{if(saveReady&&currentGame===r)queueSave(bytes,r)});
-  injectLocalSave(r).then(()=>{
+  injectLocalSave(r).then(async()=>{
    if(currentGame!==r)return;
+   if(restoreState){
+    if(!matchingState(restoreState))throw Error("Cloud-QuickSave und Spielversion passen nicht zusammen.");
+    const stateBytes=new Uint8Array(await restoreState.bytes.arrayBuffer());
+    if(currentGame!==r)return;
+    gm.loadState(stateBytes);
+    $("recoveryStatus").textContent="Cloud-QuickSave mit passender Version geladen. Wenn dein Spielstand erscheint, jetzt im Pokémon-Menü speichern und auf „Spielstand gesichert“ warten. Danach den neuen Patch starten.";
+   }
    saveInterval=setInterval(()=>{if(saveReady&&currentGame===r)gm.saveSaveFiles()},10000);
-  }).catch(err=>{saveStatus.textContent="Spielstand konnte nicht übernommen werden: "+err.message;console.error(err)});
+  }).catch(err=>{saveReady=false;saveStatus.textContent="Spielstand konnte nicht übernommen werden: "+err.message;if(restoreState)$("recoveryStatus").textContent="Wiederherstellung: "+err.message;console.error(err)});
   setTimeout(()=>{if(currentGame!==r)return;speedIndex=2;applyEmulatorSpeed(false);startSpeedMeter();game.focus({preventScroll:true})},900);
  };
  const sc=document.createElement("script");sc.id="ejs-loader";sc.src="https://cdn.emulatorjs.org/4.2.3/data/loader.js";sc.async=true;sc.onerror=()=>alert("EmulatorJS konnte nicht geladen werden.");document.body.appendChild(sc)}
