@@ -129,6 +129,15 @@ const PROJECTS={
  smaragd:{key:"smaragd-plus",title:"Pokémon Smaragd Plus",repo:"domxx1/pokemon-smaragd-plus",branch:"feature/overworld-encounters",saveBranch:"cloud-saves",workflow:"Smaragd Plus Build",artifact:"smaragd-plus-test-build"},
  retronium:{key:"retronium",title:"Pokémon Retronium",repo:"domxx1/pokemon-retronium",branch:"feature/retro-platinum-restart",saveBranch:"cloud-saves",workflow:"Retronium Retro Platinum Base",artifact:"Pokemon-Retronium-Retro-Platinum-Basis"}
 };
+const launchParams=new URLSearchParams(location.search),requestedProject=launchParams.get("project");
+let autoLaunchPending=requestedProject&&PROJECTS[requestedProject]?requestedProject:null;
+if(autoLaunchPending){
+ const p=PROJECTS[autoLaunchPending],repo=launchParams.get("repo"),branch=launchParams.get("branch"),sha=launchParams.get("sha");
+ if(repo&&repo===p.repo)p.repo=repo;
+ if(branch)p.branch=branch;
+ if(sha)p.targetSha=sha;
+ if(autoLaunchPending==="smaragd"&&branch==="tools/web-map-builder")p.title="Pokémon Smaragd Plus · MapBuilder-Test";
+}
 const $=id=>document.getElementById(id); let currentGame=null,romUrl=null,cloudTimer=null,speedMeterTimer=null,turboAudioState=null,turboResumeTimer=null,saveInterval=null,saveReady=false,saveWriteQueue=Promise.resolve(),cloudWriteQueue=Promise.resolve();
 const tokenInput=$("token"),ghStatus=$("ghStatus"),library=$("library"),libraryPanel=$("libraryPanel"),playerPanel=$("playerPanel"),game=$("game"),gameTitle=$("gameTitle"),saveStatus=$("saveStatus");
 const rememberToken=$("rememberToken");
@@ -196,6 +205,9 @@ $("connect").onclick=async()=>{
    ghStatus.textContent="Verbunden als "+u.login+(rememberToken.checked?" · Token auf diesem Gerät gespeichert":" · nur für diese Sitzung")+" · private Builds + Cloud-Saves aktiv";
    await refreshCloudLabels();
    await showPatches();
+   if(autoLaunchPending){
+    const id=autoLaunchPending;autoLaunchPending=null;await loadProject(id);
+   }
  }catch(e){
    sessionStorage.removeItem("ghToken");
    if(!rememberToken.checked)localStorage.removeItem("ghTokenPersistent");
@@ -214,7 +226,16 @@ $("forgetToken").onclick=()=>{
  ghStatus.textContent="Gespeicherter Token wurde von diesem Gerät entfernt.";
 };
 async function refreshCloudLabels(){for(const [id,p] of Object.entries(PROJECTS)){if(id==="smaragd")continue;try{const r=await latestRun(p);$(id+"Status").textContent="Letzter erfolgreicher Build: "+r.head_sha.slice(0,7)+" · "+fmt(r.created_at)}catch(e){$(id+"Status").textContent=e.message}}}
-async function latestRun(p){const head=await (await gh("https://api.github.com/repos/"+p.repo+"/branches/"+encodeURIComponent(p.branch))).json();const u="https://api.github.com/repos/"+p.repo+"/actions/runs?branch="+encodeURIComponent(p.branch)+"&status=success&per_page=30";const j=await (await gh(u)).json();const r=(j.workflow_runs||[]).find(x=>x.name===p.workflow&&x.head_sha===head.commit.sha);if(!r)throw Error("Kein erfolgreicher GitHub-Build für den aktuellen Commit. Test-GBA importieren.");return r}
+async function latestRun(p){
+ let target=p.targetSha||null;
+ if(!target){
+  const head=await (await gh("https://api.github.com/repos/"+p.repo+"/branches/"+encodeURIComponent(p.branch))).json();target=head.commit.sha;
+ }
+ const u="https://api.github.com/repos/"+p.repo+"/actions/runs?branch="+encodeURIComponent(p.branch)+"&status=success&per_page=50";
+ const j=await (await gh(u)).json(),r=(j.workflow_runs||[]).find(x=>x.name===p.workflow&&x.head_sha===target);
+ if(!r)throw Error("Kein erfolgreicher GitHub-Build für "+target.slice(0,7)+" auf "+p.branch+".");
+ return r
+}
 async function loadProject(id){
  const p=PROJECTS[id],st=$(id+"Status");try{
   st.textContent="Suche neuesten Build…";const run=await latestRun(p);
@@ -778,5 +799,9 @@ window.addEventListener("pagehide",()=>{
   }
  }catch(e){}
 });
-render();if(token()){$("connect").click()}
+render();
+if(autoLaunchPending&&!token()){
+ const st=$(autoLaunchPending+"Status");if(st)st.textContent="MapBuilder-Playtest bereit · bitte GitHub verbinden, dann startet der Build automatisch.";
+}
+if(token()){$("connect").click()}
 </script></body></html>
